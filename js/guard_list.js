@@ -308,4 +308,15 @@ async function saveStatusOverride() {
 // ── Init ──────────────────────────────────────────────────────
 if (session) {
     loadAllPasses();
+
+    // Auto-refresh every 5 minutes (5 * 60 * 1000 ms)
+    setInterval(() => {
+        const modal = document.getElementById("status-modal");
+        const isModalActive = modal && modal.classList.contains("active");
+
+        if (!isModalActive) {
+            console.log("Auto-refreshing guard list...");
+            loadAllPasses();
+        }
+    }, 5 * 60 * 1000);
 }

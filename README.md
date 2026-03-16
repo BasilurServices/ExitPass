@@ -6,14 +6,15 @@ A professional, digital solution for managing employee exit passes. This system 
 
 ## 🌟 Key Features
 
-- **Digital QR Passes**: Automatically generated 6-digit unique QR codes for approved exit requests.
-- **Role-Based Access**: Specialized views for Employees, Approvers, Guards, HR, and Admins.
-- **Real-time Movement Log**: Instant tracking of employee exit and return times.
-- **Security First**: Password-protected access for HR and Admin roles.
-- **Automatic Expiry**: Safety feature that expires unused passes after the planned return time.
-- **Return Tracking**: Option to specify if a return is required, allowing for one-way or round-trip passes.
-- **Mobile Ready**: Fully responsive design for use on smartphones, tablets, and desktops.
-- **Multi-Channel Notifications**: Automated SMS and Email updates for pass status changes.
+- **Digital QR Passes**: Automatically generated unique 6-digit numeric IDs and QR codes for all approved exit requests.
+- **Role-Based Access**: Granular control for Employees, Approvers, Security Guards, HR, and Admins.
+- **HR Statistics Dashboard**: Professional analytics suite with weekly trends, hourly distribution, reason analysis, and top exiter tracking.
+- **Automated Overdue Alerts**: Real-time monitoring with automated SMS alerts sent to employees who overstay their return window.
+- **Flexible Return Monitoring**: Approvers can specify expected return buffers (1h, 2h, 3hr, or none) during the approval process.
+- **Movement Hierarchy**: Strict logical flow (`NOT_EXITED` → `EXITED` → `RETURNED`) with guard-based timestamping and force-override capabilities.
+- **Security Guard Log**: Optimized list view featuring a live 24h clock, auto-refresh, and color-coded status indicators (Amber for upcoming, Red for late).
+- **Multi-Channel Notifications**: Real-time SMS (via Python/Gammu bridge) and HTML-email notifications for all stakeholders.
+- **Mobile-First Design**: Fully responsive UI designed for rugged gate-side tablet use and mobile employee access.
 
 ---
 
@@ -23,31 +24,30 @@ The system is built on a robust role-based access control (RBAC) model:
 
 ### 👤 Employee
 *Primary User who initiates the exit workflow.*
-- ✅ **CAN**: Submit new exit pass requests.
-- ✅ **CAN**: View personal pass history with pagination.
-- ✅ **CAN**: Access unique QR codes for approved passes.
-- ✅ **CAN**: Cancel pending requests or send reminders to approvers.
-- ✅ **CAN**: Update personal profile details (Phone/Email).
+- ✅ **CAN**: Submit new exit requests and update contact details (Phone/Email).
+- ✅ **CAN**: View personal pass history with optimized pagination (5 records per page).
+- ✅ **CAN**: Access dynamic QR codes and send reminders to HR for pending requests.
+- ✅ **CAN**: Cancel their own pending requests if no longer needed.
 
 ### 👔 Approver (Manager / Dept. Head)
 *Decision-maker responsible for reviewing requests.*
-- ✅ **CAN**: View real-time list of all PENDING requests.
-- ✅ **CAN**: Approve or Reject requests via portal or direct SMS link.
-- ✅ **CAN**: View the status of all passes across the organization.
+- ✅ **CAN**: Filter and approve requests with specific **Expected Return Durations**.
+- ✅ **CAN**: Receive direct SMS/Email links to process passes instantly from mobile.
+- ✅ **CAN**: Monitor department-wide movements in real-time.
 
 ### 🛡️ Guard (Security Personnel)
 *Enforcer of gate security and movement logging.*
-- ✅ **CAN**: Scan QR codes or manually enter Pass IDs.
-- ✅ **CAN**: Verify if a pass is valid, approved, and not expired.
-- ✅ **CAN**: Mark an employee as **EXITED** or **RETURNED**.
-- ✅ **CAN**: View the **Guard Log** (filtered for current day's active passes).
+- ✅ **CAN**: Use the QR Scanner or Manual ID Entry for high-speed gate processing.
+- ✅ **CAN**: Access a dedicated **Guard List** that auto-refreshes every 5 mins.
+- ✅ **CAN**: Track active durations with visual "Late" (Red/Pulse) indicators.
+- ✅ **CAN**: **Force Override**: Long-press any entry (800ms) to manually correct movement status.
 
 ### 🏢 HR & Admin
-*System administrators.*
-- ✅ **CAN**: Perform all duties of Approvers and Guards.
-- ✅ **CAN**: **Add, Edit, and Delete** user profiles across multiple sheets (Factory/Office).
-- ✅ **CAN**: Manage employee roles and set/reset administrative passwords.
-- 🔐 **SECURITY**: Requires a unique password for entry.
+*System administrators and analysts.*
+- ✅ **CAN**: Access the **Statistics Dashboard** for behavioral analysis and trend tracking.
+- ✅ **CAN**: **Export Data**: Download the entire pass history as a CSV for reporting.
+- ✅ **CAN**: Manage the User Directory (FACTORY_USERS / OFFICE_USERS).
+- 🔐 **SECURITY**: Advanced dashboard features require a distinct administrative password.
 
 ---
 
@@ -56,22 +56,26 @@ The system is built on a robust role-based access control (RBAC) model:
 The system is governed by several automated business rules to ensure efficiency and data integrity:
 
 ### 1. Pass Creation Rules
-- **Single Active Pass Constraint**: An employee cannot create a new request if they already have an "active" pass (Status: `PENDING`, `APPROVED`, or `EXITED`).
-- **Auto-Rejection of Stale Passes**: When a user attempts to create a new request, the system automatically checks for old `PENDING` passes. Any pending pass from a previous day or more than 2 hours old today is auto-rejected to keep the queue clean.
-- **1.5 Hour Return Policy**: By default, the system calculates an "Expected Return Time" exactly **1.5 hours (90 minutes)** from the requested exit time. This serves as the threshold for overdue monitoring.
-- **User ID Normalization**: The system automatically strips leading zeros (e.g., `002` → `2`) and handles case-insensitivity to ensure consistent tracking across different entry formats.
+- **Anti-Duplication Constraint**: Employees cannot create new requests while they have an active pass (`PENDING`, `APPROVED`, or `EXITED`).
+- **Auto-Cleanup**: The system auto-rejects `PENDING` requests that are from previous days or > 2 hours old to prevent queue clutter.
+- **Normalization Engine**: Automatically formats Employee IDs (e.g., `002` → `2`) to prevent duplicate records and ensure search accuracy.
 
 ### 2. Guard & Movement Logic
-- **Automated Expiry Check**: When a Guard scans a pass, the system performs a real-time validity check. If the pass is `APPROVED` but the current time has exceeded the "Expected Return Time" (or it's from a previous day), the status is auto-updated to `EXPIRED`.
-- **Duration Tracking & Color Coding**: For employees who have exited, the Guard view tracks the duration of their absence. If the duration exceeds **90 minutes**, the system highlights the entry as **LATE** (Red) to alert security.
-- **Long-Press Override**: Security guards can perform a "Long Press" (800ms) on any pass entry to trigger a manual status override, allowing them to correct accidental exit/return markings.
-- **Smart Filtering & Sorting**: The Guard list dynamically de-duplicates and sorts entries: **Upcoming Exits** (Top) → **Expected Returns** (Middle) → **Today's History** (Bottom).
-- **Movement Hierarchy**: Passes must follow a strict logical flow: `NOT_EXITED` → `EXITED` → `RETURNED`. Once `RETURNED`, the pass lifecycle is closed.
+- **Precision Timing**: Movement is tracked from the *actual* exit time, not the requested time. The return window updates dynamically upon exit scan.
+- **Smart Expiry**: Passes auto-expire if not used by the expected return time.
+- **Late Indicators**: If "Return Required" is Yes, the system pulses **Red** once the 90-minute (or custom) threshold is exceeded.
+- **Force Revert**: Security can revert statuses (e.g., `RETURNED` → `EXITED`) via the long-press modal to fix human errors during busy hours.
+- **Auto-Refresh**: The Guard List refreshes every 5 minutes to ensure new approvals appear without manual interaction.
 
-### 3. UI/UX Features
-- **Real-time Clock**: All administrative and guard views feature a synchronized real-time clock and date display in the navigation bar for accurate timestamp verification.
-- **Interactive Reminders**: Employees can send a "Remind Approver" alert for passes pending for more than 30 minutes, keeping the workflow moving.
-- **Paginated Data**: Large logs (History/Admin) are paginated to ensure optimal performance on mobile devices with limited bandwidth.
+### 3. HR & Analytics
+- **Live Statistics**: real-time breakdown of Pending, Approved, Rejected, and "Currently Out" counts.
+- **Detailed Trends**: Last 7/30/90 day analytics showing:
+    - **Weekly Exit Trends** (Growth/Decline)
+    - **Reason Distribution** (Doughnut chart)
+    - **Departmental Comparison** (Bar chart)
+    - **Hourly Peak Analysis** (Histogram)
+- **Frequent Exiters**: Dynamic table showing employees with the highest exit frequency and total time away.
+- **CSV Data Hub**: Single-click export of the entire database for external audit activities.
 
 ### 4. Notification Logic
 - **SMS Gateway (Gammu)**: A specialized Python bridge polls the database and sends SMS via a GSM modem.
@@ -92,10 +96,18 @@ graph TD
     E --> F[Employee Marked EXITED]
     F --> G{Return Required?}
     G -- No --> H[Pass Completed]
-    G -- Yes --> I[Employee Returns]
-    I --> J[Guard Scans QR Again]
-    J --> K[Employee Marked RETURNED]
-    K --> H
+    G -- Yes --> I[Expected Return Buffer]
+    I --> J{Overdue?}
+    J -- Yes --> K[Automated SMS Alert]
+    K --> L[Employee Returns]
+    J -- No --> L
+    L --> M[Guard Scans QR Again]
+    M --> N[Employee Marked RETURNED]
+    N --> H
+    
+    %% Automated Logic
+    X[Stale Request Check] -.-> |Next Day / >2hr| C
+    Y[Unused Pass Check] -.-> |After Return Time| Z[Status: EXPIRED]
 ```
 
 ---

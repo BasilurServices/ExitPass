@@ -111,7 +111,9 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 20px;
-      min-height: 350px;
+      height: 320px;
+      display: flex;
+      flex-direction: column;
     }
 
     .chart-title {
@@ -815,7 +817,7 @@
     }
 
     // ── Approve / Reject ──────────────────────────────────────────
-    async function handleApprove(passId, status, skipConfirm = false) {
+    async function handleApprove(passId, status, skipConfirm = false, expected_duration = "NONE") {
       const action = status === "APPROVED" ? "approve" : "reject";
 
       if (!skipConfirm) {
@@ -836,6 +838,7 @@
         pass_id: passId,
         status,
         approver_name: session.name,
+        expected_duration,
       });
 
       if (res.success) {
@@ -1245,7 +1248,30 @@
             <div style="font-size: 13px;">${p.return_required === 'No' ? 'No Return' : UI.formatDateTime(p.exit_to)}</div>
           </div>
         </div>
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Expected Return Time Frame</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn--ghost btn--sm duration-btn" data-hours="1">1 Hour</button>
+            <button class="btn btn--ghost btn--sm duration-btn" data-hours="2">2 Hours</button>
+            <button class="btn btn--ghost btn--sm duration-btn" data-hours="3">3 Hours</button>
+            <button class="btn btn--ghost btn--sm duration-btn active" data-hours="NONE" style="background:var(--premium-blue); color:#fff;">No Limit</button>
+          </div>
+        </div>
       `;
+
+      // Duration selector logic
+      modal.querySelectorAll('.duration-btn').forEach(btn => {
+        btn.onclick = () => {
+          modal.querySelectorAll('.duration-btn').forEach(b => {
+             b.classList.remove('active');
+             b.style.background = '';
+             b.style.color = '';
+          });
+          btn.classList.add('active');
+          btn.style.background = 'var(--premium-blue)';
+          btn.style.color = '#fff';
+        };
+      });
 
       document.getElementById("modal-approve-btn").style.display = "block";
       document.getElementById("modal-reject-btn").style.display = "block";
@@ -1253,10 +1279,13 @@
       document.getElementById("modal-approve-btn").onclick = async () => {
         const btnA = document.getElementById("modal-approve-btn");
         const btnR = document.getElementById("modal-reject-btn");
+        const activeBtn = modal.querySelector('.duration-btn.active');
+        const duration = activeBtn ? activeBtn.dataset.hours : "NONE";
+
         UI.setButtonLoading(btnA, true);
         btnR.disabled = true;
 
-        await handleApprove(passId, 'APPROVED', true);
+        await handleApprove(passId, 'APPROVED', true, duration);
 
         UI.setButtonLoading(btnA, false);
         btnR.disabled = false;

@@ -86,8 +86,8 @@ const API = (() => {
   }
 
   // ── 6. Approve or Reject Pass ─────────────────────────────────
-  async function approvePass({ pass_id, status, approver_name }) {
-    return call({ action: "approvePass", pass_id, status, approver_name });
+  async function approvePass({ pass_id, status, approver_name, expected_duration }) {
+    return call({ action: "approvePass", pass_id, status, approver_name, expected_duration });
   }
 
   // ── 7. Verify Pass (QR scan landing) ─────────────────────────

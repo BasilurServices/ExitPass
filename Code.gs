@@ -51,6 +51,7 @@ const PASS_COLS = {
   return_required:    14,
   email_notification: 15,   // "SENT" | "PARTIAL" | "FAILED" | "NONE"
   overdue_notified:   16,   // "YES"
+  expected_duration:  17,   // Hours: 1, 2, 3 or "NONE"
 };
 
 // EMAIL_LOG sheet columns
@@ -481,6 +482,18 @@ function createExitPass(body) {
         const rowIndex = i + 2; // +1 for 0-index, +1 for header
         sheet.getRange(rowIndex, PASS_COLS.approval_status).setValue("REJECTED");
         sheet.getRange(rowIndex, PASS_COLS.approved_by).setValue("System (Auto-Reject)");
+        
+        // Notify user of auto-rejection
+        try {
+          const userKey = normalizeUserId(r[PASS_COLS.user_id - 1]);
+          const userMap = buildUserMap();
+          const employee = userMap[userKey];
+          if (employee && employee.phone) {
+             queueSMS(employee.phone, `Exit Pass REJECTED by system (Pass #${r[PASS_COLS.pass_id - 1]}). Please request a new one if needed.`);
+          }
+        } catch (smsErr) {
+          Logger.log("Auto-reject SMS failed: " + smsErr.message);
+        }
         continue; // This pass is no longer blocking
       }
     }
@@ -702,7 +715,7 @@ function getAllPasses(body) {
 
 // ── 6. APPROVE PASS ───────────────────────────────────────────────
 function approvePass(body) {
-  const { pass_id, status, approver_name } = body;
+  const { pass_id, status, approver_name, expected_duration } = body;
   if (!pass_id || !status) return { success: false, error: "pass_id and status required." };
   if (!["APPROVED", "REJECTED"].includes(status)) {
     return { success: false, error: "Invalid status. Use APPROVED or REJECTED." };
@@ -727,6 +740,10 @@ function approvePass(body) {
       const updateValues = [[status, approver_name || "System", updateTime]];
       sheet.getRange(i + 1, PASS_COLS.approval_status, 1, 3).setValues(updateValues);
       
+      if (expected_duration !== undefined) {
+        sheet.getRange(i + 1, PASS_COLS.expected_duration).setValue(expected_duration);
+      }
+      
       // Notify employee via SMS
       try {
         const userKey = normalizeUserId(rows[i][PASS_COLS.user_id - 1]);
@@ -734,7 +751,11 @@ function approvePass(body) {
         const employee = userMap[userKey];
         if (employee && employee.phone && status === "APPROVED") {
            const qrLink = `https://basilurservices.github.io/ExitPass/my_pass.html?id=${pass_id}`;
-           const msg = `Exit Pass APPROVED\nPass #${pass_id}\nApprover: ${approver_name || 'System'}\n\nLink: ${qrLink}`;
+           let durationMsg = "";
+           if (expected_duration && expected_duration !== "NONE") {
+             durationMsg = `\nExpected Return: Within ${expected_duration} hour(s)`;
+           }
+           const msg = `Exit Pass APPROVED\nPass #${pass_id}\nApprover: ${approver_name || 'System'}${durationMsg}\n\nLink: ${qrLink}`;
            queueSMS(employee.phone, msg);
         }
       } catch (err) {
@@ -850,10 +871,21 @@ function updateMovementStatus(body) {
       rowValues[PASS_COLS.guard_name - 1] = guard_name || "";
       if (movement === "EXITED") {
         rowValues[PASS_COLS.exit_time - 1] = updateTime;
-        // Automatically start the 1.5 hour timer from actual exit
+        // Automatically calculate exit_to from actual exit
         const actualExitDate = new Date(updateTime);
-        const autoTo = new Date(actualExitDate.getTime() + (90 * 60 * 1000));
-        rowValues[PASS_COLS.exit_to - 1] = autoTo.toISOString();
+        const storedDuration = row[PASS_COLS.expected_duration - 1];
+        
+        if (storedDuration && storedDuration !== "NONE") {
+          const hours = parseFloat(storedDuration);
+          const autoTo = new Date(actualExitDate.getTime() + (hours * 60 * 60 * 1000));
+          rowValues[PASS_COLS.exit_to - 1] = autoTo.toISOString();
+        } else if (storedDuration === "NONE" || row[PASS_COLS.return_required - 1] === "No") {
+          rowValues[PASS_COLS.exit_to - 1] = ""; // No deadline
+        } else {
+          // Default expiry: 1.5 hours if not specified
+          const autoTo = new Date(actualExitDate.getTime() + (90 * 60 * 1000));
+          rowValues[PASS_COLS.exit_to - 1] = autoTo.toISOString();
+        }
       }
       if (movement === "RETURNED" || finalMovement === "RETURNED") rowValues[PASS_COLS.return_time - 1] = updateTime;
       
@@ -1506,6 +1538,17 @@ function autoExpirePasses() {
       if (!reqTime || !isToday(reqTime) || ageHours > 2) {
         sheet.getRange(i + 1, PASS_COLS.approval_status).setValue("REJECTED");
         sheet.getRange(i + 1, PASS_COLS.approved_by).setValue("System (Auto-Reject)");
+        
+        // Notify user
+        try {
+          const userKey = normalizeUserId(row[PASS_COLS.user_id - 1]);
+          const employee = userMap[userKey];
+          if (employee && employee.phone) {
+             queueSMS(employee.phone, `Exit Pass REJECTED by system (Pass #${row[PASS_COLS.pass_id - 1]}). Please request a new one if needed.`);
+          }
+        } catch(e) {
+          Logger.log("Auto-reject trigger SMS failed: " + e.message);
+        }
       }
     }
     
@@ -2014,4 +2057,26 @@ function remindApprover(body) {
     }
   }
   return { success: false, error: "Pass not found." };
+}
+// ── 14. SETUP TRIGGERS ───────────────────────────────────────────
+/**
+ * Run this function once from the Apps Script editor to setup 
+ * the automatic background processes.
+ */
+function setupTriggers() {
+  // Clear existing triggers for this function to avoid duplicates
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === "autoExpirePasses") {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  // Setup 10-minute trigger
+  ScriptApp.newTrigger("autoExpirePasses")
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+    
+  Logger.log("Triggers setup successfully! System will now auto-reject/expire every 10 minutes.");
 }
