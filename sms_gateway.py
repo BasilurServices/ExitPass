@@ -5,7 +5,7 @@ import json
 
 # Configure your Google Apps Script Web App URL here
 # Example: "https://script.google.com/macros/s/AKfycby.../exec"
-API_URL = "https://script.google.com/macros/s/AKfycbypynp6KuIfQ1GThp3WiQPQsnZPTrHwx8uLoyDBptO7rcn0-Ag7g0Au2F_ReLWUElfl/exec"
+API_URL = "https://script.google.com/macros/s/AKfycbwgleAC7rGtaYLZM0m7nzgOOhDmqJCu4nKojHUgFN35MvOsPOIpTY3vPqTFVddVz0E/exec"
 
 def send_sms(phone_number, message):
     """
