@@ -264,6 +264,11 @@ const UI = (() => {
             <input type="tel" id="p-phone" class="form-input" value="${u.phone || ''}" placeholder="07XXXXXXXX" style="width:100%; background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px;">
           </div>
           
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label class="form-label" for="p-password" style="display:block; font-size: 0.7rem; color: #bbb; text-transform: uppercase; margin-bottom: 5px;">New Password (Leave blank to keep current)</label>
+            <input type="password" id="p-password" class="form-input" placeholder="••••••••" style="width:100%; background: #1a1a1a; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px;">
+          </div>
+          
           <div style="display: flex; gap: 12px; position: sticky; bottom: 0; background: #121212; padding-top: 10px;">
             <button type="button" class="btn btn--ghost" id="profile-cancel" style="flex:1;">Cancel</button>
             <button type="submit" class="btn btn--primary" id="profile-save" style="flex:2;">Save Changes</button>
@@ -277,10 +282,11 @@ const UI = (() => {
         e.preventDefault();
         const email = document.getElementById("p-email").value.trim();
         const phone = document.getElementById("p-phone").value.trim();
+        const password = document.getElementById("p-password").value.trim();
         const saveBtn = document.getElementById("profile-save");
 
         setButtonLoading(saveBtn, true);
-        const updateRes = await API.updateUserProfile({ user_id: userId, email, phone });
+        const updateRes = await API.updateUserProfile({ user_id: userId, email, phone, password });
         setButtonLoading(saveBtn, false);
 
         if (updateRes.success) {

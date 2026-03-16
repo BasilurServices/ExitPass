@@ -136,8 +136,8 @@ const API = (() => {
   }
 
   // ── 12. Update User Profile ──────────────────────────────────────
-  async function updateUserProfile({ user_id, email, phone }) {
-    return call({ action: "updateUserProfile", user_id, email, phone });
+  async function updateUserProfile({ user_id, email, phone, password }) {
+    return call({ action: "updateUserProfile", user_id, email, phone, password });
   }
 
   return {

@@ -1917,7 +1917,7 @@ function getUserProfile(body) {
  */
 function updateUserProfile(body) {
   const userId = normalizeUserId(body.user_id);
-  const { email, phone } = body;
+  const { email, phone, password } = body;
   
   if (!userId) return { success: false, error: "User ID required." };
 
@@ -1933,6 +1933,9 @@ function updateUserProfile(body) {
         }
         if (phone !== undefined) {
           sheet.getRange(i + 1, USER_COLS.phone).setValue(phone);
+        }
+        if (password !== undefined && password !== "") {
+          sheet.getRange(i + 1, USER_COLS.password).setValue(password);
         }
         
         // Clear cache
