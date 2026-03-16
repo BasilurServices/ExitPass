@@ -62,6 +62,14 @@ const API = (() => {
     return call({ action: "createExitPass", user_id, reason, exit_from, exit_to, return_required, phone });
   }
 
+  async function cancelExitPass(pass_id, user_id) {
+    return call({ action: "cancelExitPass", pass_id, user_id });
+  }
+
+  async function remindApprover(pass_id, user_id) {
+    return call({ action: "remindApprover", pass_id, user_id });
+  }
+
   // ── 3. Get My Passes (for employee) ───────────────────────────
   async function getMyPasses(user_id, limit = 5, offset = 0) {
     return call({ action: "getMyPasses", user_id, limit, offset });
@@ -136,6 +144,8 @@ const API = (() => {
     getAllPasses,
     approvePass,
     verifyPass,
+    cancelExitPass,
+    remindApprover,
     getApprovedPasses,
     updateMovementStatus,
     revertMovementStatus,

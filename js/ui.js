@@ -47,6 +47,7 @@ const UI = (() => {
       EXITED: ["exited", "Exited"],
       RETURNED: ["returned", "Returned"],
       NOT_EXITED: ["not_exited", "Not Exited"],
+      CANCELLED: ["expired", "Cancelled"],
     };
     const [cls, label] = map[status] || ["pending", status];
     return `<span class="badge badge--${cls}">${label}</span>`;

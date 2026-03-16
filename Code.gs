@@ -101,6 +101,8 @@ function doPost(e) {
       case "updateSMSStatus":     result = updateSMSStatus(body);     break;
       case "getUserProfile":      result = getUserProfile(body);      break;
       case "updateUserProfile":   result = updateUserProfile(body);   break;
+      case "cancelExitPass":      result = cancelExitPass(body);      break;
+      case "remindApprover":      result = remindApprover(body);      break;
       default:
         result = { success: false, error: "Unknown action: " + action };
     }
@@ -442,16 +444,41 @@ function createExitPass(body) {
   }
 
   const sheet   = getSheet("EXIT_PASSES");
+  const passRows = getAllRows(sheet);
+  const normalizedUid = normalizeUserId(user_id);
+
+  // ── Validation for Multiple Active Passes ────────────────────
+  const activePass = passRows.find(r => {
+    const rUid = normalizeUserId(r[PASS_COLS.user_id - 1]);
+    const approval = r[PASS_COLS.approval_status - 1];
+    const movement = r[PASS_COLS.movement_status - 1];
+    return rUid === normalizedUid && 
+           (approval === "PENDING" || approval === "APPROVED") && 
+           (movement !== "RETURNED" && movement !== "EXPIRED");
+  });
+
+  if (activePass) {
+    return { success: false, error: "You already have an active exit pass. Please complete or cancel it before creating a new one." };
+  }
+
   const pass_id = generatePassId();
   const requestTime = now();
 
+  // ── Automatic exit_to Calculation (1.5 hours) ──────────────
+  let finalExitTo = exit_to;
+  if (!finalExitTo) {
+    const exitTimeObj = exitFromDate;
+    const autoTo = new Date(exitTimeObj.getTime() + (90 * 60 * 1000)); // 90 mins = 1.5 hours
+    finalExitTo = autoTo.toISOString();
+  }
+
   const row = new Array(Object.keys(PASS_COLS).length).fill("");
   row[PASS_COLS.pass_id         - 1] = pass_id;
-  row[PASS_COLS.user_id         - 1] = normalizeUserId(user_id);
+  row[PASS_COLS.user_id         - 1] = normalizedUid;
   row[PASS_COLS.reason          - 1] = reason;
   row[PASS_COLS.request_time    - 1] = requestTime;
   row[PASS_COLS.exit_from       - 1] = exit_from;
-  row[PASS_COLS.exit_to         - 1] = exit_to || "";
+  row[PASS_COLS.exit_to         - 1] = finalExitTo;
   row[PASS_COLS.approval_status - 1] = "PENDING";
   row[PASS_COLS.movement_status - 1] = "NOT_EXITED";
   row[PASS_COLS.return_required - 1] = return_required || "Yes";
@@ -647,6 +674,10 @@ function approvePass(body) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][PASS_COLS.pass_id - 1]).trim() === searchId) {
       if (rows[i][PASS_COLS.approval_status - 1] !== "PENDING") {
+        const currentStatus = rows[i][PASS_COLS.approval_status - 1];
+        if (currentStatus === "CANCELLED") {
+          return { success: false, error: "This pass has been cancelled by the user." };
+        }
         return { success: false, error: "This pass has already been processed." };
       }
       
@@ -776,16 +807,33 @@ function updateMovementStatus(body) {
       const rowValues = [...rows[i]];
       rowValues[PASS_COLS.movement_status - 1] = finalMovement;
       rowValues[PASS_COLS.guard_name - 1] = guard_name || "";
-      if (movement === "EXITED") rowValues[PASS_COLS.exit_time - 1] = updateTime;
+      if (movement === "EXITED") {
+        rowValues[PASS_COLS.exit_time - 1] = updateTime;
+        // Automatically start the 1.5 hour timer from actual exit
+        const actualExitDate = new Date(updateTime);
+        const autoTo = new Date(actualExitDate.getTime() + (90 * 60 * 1000));
+        rowValues[PASS_COLS.exit_to - 1] = autoTo.toISOString();
+      }
       if (movement === "RETURNED" || finalMovement === "RETURNED") rowValues[PASS_COLS.return_time - 1] = updateTime;
       
       const batchValues = [[
         rowValues[PASS_COLS.movement_status - 1],
         rowValues[PASS_COLS.exit_time - 1],
         rowValues[PASS_COLS.return_time - 1],
-        rowValues[PASS_COLS.guard_name - 1]
+        rowValues[PASS_COLS.guard_name - 1],
+        rowValues[PASS_COLS.exit_to - 1]
       ]];
-      sheet.getRange(i + 1, PASS_COLS.movement_status, 1, 4).setValues(batchValues);
+      
+      sheet.getRange(i + 1, PASS_COLS.movement_status, 1, 4).setValues([[
+        rowValues[PASS_COLS.movement_status - 1],
+        rowValues[PASS_COLS.exit_time - 1],
+        rowValues[PASS_COLS.return_time - 1],
+        rowValues[PASS_COLS.guard_name - 1]
+      ]]);
+      
+      if (movement === "EXITED") {
+        sheet.getRange(i + 1, PASS_COLS.exit_to).setValue(rowValues[PASS_COLS.exit_to - 1]);
+      }
 
       return { success: true, pass_id, movement: finalMovement };
     }
@@ -1673,4 +1721,110 @@ function testSMS() {
   Logger.log("Queueing test SMS...");
   queueSMS("0776337250", "Test message from Basilur Exit Pass System. If you receive this, the gateway is working!");
   Logger.log("Test SMS queued successfully! Check the SMS_QUEUE sheet and run your Python script.");
+}
+
+// ── 13. CANCEL EXIT PASS ──────────────────────────────────────────
+function cancelExitPass(body) {
+  const { pass_id, user_id } = body;
+  if (!pass_id) return { success: false, error: "pass_id required." };
+
+  const sheet = getSheet("EXIT_PASSES");
+  const rows = sheet.getDataRange().getValues();
+  const searchId = String(pass_id).trim();
+  const normalizedUid = normalizeUserId(user_id);
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][PASS_COLS.pass_id - 1]).trim() === searchId) {
+      const ownerId = normalizeUserId(rows[i][PASS_COLS.user_id - 1]);
+      if (ownerId !== normalizedUid) {
+        return { success: false, error: "You are not authorized to cancel this pass." };
+      }
+
+      const currentStatus = rows[i][PASS_COLS.approval_status - 1];
+      if (currentStatus !== "PENDING") {
+        return { success: false, error: "Only pending passes can be cancelled." };
+      }
+
+      sheet.getRange(i + 1, PASS_COLS.approval_status).setValue("CANCELLED");
+      return { success: true, pass_id };
+    }
+  }
+  return { success: false, error: "Pass not found." };
+}
+
+// ── 14. REMIND APPROVER ──────────────────────────────────────────
+function remindApprover(body) {
+  const { pass_id, user_id } = body;
+  if (!pass_id) return { success: false, error: "pass_id required." };
+
+  const sheet = getSheet("EXIT_PASSES");
+  const rows = sheet.getDataRange().getValues();
+  const searchId = String(pass_id).trim();
+  const normalizedUid = normalizeUserId(user_id);
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][PASS_COLS.pass_id - 1]).trim() === searchId) {
+      const ownerId = normalizeUserId(rows[i][PASS_COLS.user_id - 1]);
+      if (ownerId !== normalizedUid) {
+        return { success: false, error: "You are not authorized to send reminders for this pass." };
+      }
+
+      const status = rows[i][PASS_COLS.approval_status - 1];
+      if (status !== "PENDING") {
+        return { success: false, error: "Can only remind for pending requests." };
+      }
+
+      const requestTime = new Date(rows[i][PASS_COLS.request_time - 1]);
+      const nowTime = new Date();
+      const diffMins = (nowTime - requestTime) / (60 * 1000);
+
+      // In production, we check for 30 mins.
+      if (diffMins < 30) {
+        return { success: false, error: "Please wait at least 30 minutes before sending a reminder." };
+      }
+
+      // Send SMS reminders only (with "REMINDER" prefix)
+      try {
+        const passData = {
+          pass_id: searchId,
+          exit_from: rows[i][PASS_COLS.exit_from - 1],
+          user_id: ownerId
+        };
+        
+        const approverPhones = [];
+        const userMap = buildUserMap();
+        const employeeName = (userMap[ownerId] || {}).name || ownerId;
+
+        for (const sheetName of USER_SHEETS) {
+          const uSheet = getSheet(sheetName);
+          if (!uSheet) continue;
+          const uRows = getAllRows(uSheet);
+          uRows.forEach(r => {
+            const role = (r[USER_COLS.role - 1] || "").toString().trim().toLowerCase();
+            const dept = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
+            const phone = r[USER_COLS.phone - 1] ? r[USER_COLS.phone - 1].toString().trim() : "";
+            
+            const isHrOrAdmin = 
+              role === "admin" || role === "approver" || role === "hr" || 
+              dept === "hr" || dept === "admin";
+              
+            if (isHrOrAdmin && phone && !approverPhones.includes(phone)) {
+              approverPhones.push(phone);
+            }
+          });
+        }
+
+        if (approverPhones.length > 0) {
+          const smsMessage = `REMINDER: Exit Pass\nName: ${employeeName} (${ownerId})\n${formatSmsTime(passData.exit_from)}\nPass #${searchId}.`;
+          approverPhones.forEach(phone => queueSMS(phone, smsMessage));
+          return { success: true, message: "Reminders sent." };
+        } else {
+          return { success: false, error: "No approvers with phone numbers found." };
+        }
+      } catch (err) {
+        return { success: false, error: "Reminder failed: " + err.message };
+      }
+    }
+  }
+  return { success: false, error: "Pass not found." };
 }

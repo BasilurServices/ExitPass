@@ -429,6 +429,19 @@
           UI.isToday(pass.exit_from) &&
           !isOverdue;
 
+        let actionBtns = "";
+        if (pass.approval_status === "PENDING") {
+          const reqTime = new Date(pass.request_time);
+          const now = new Date();
+          const diffMins = (now - reqTime) / (60 * 1000);
+          const remindDisabled = diffMins < 30;
+          
+          actionBtns = `
+            <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); handleCancel('${pass.pass_id}')">✕ Cancel</button>
+            <button class="btn btn--amber btn--sm" ${remindDisabled ? 'disabled title="Available after 30 mins"' : ''} onclick="event.stopPropagation(); handleRemind('${pass.pass_id}')">🔔 Remind</button>
+          `;
+        }
+
         return `
         <div class="pass-card slide-up" data-pass-id="${pass.pass_id}" ${canShowQR ? `onclick="showQR('${pass.pass_id}', '${pass.approval_status}')" style="cursor:pointer;" title="Click to view QR Code"` : ""}>
           <div class="pass-card__top">
@@ -450,6 +463,7 @@
           <div class="pass-card__actions">
             ${timeChip}
             ${canShowQR ? `<button class="btn btn--ghost btn--sm" onclick="event.stopPropagation(); showQR('${pass.pass_id}', '${pass.approval_status}')">📱 View QR</button>` : ""}
+            ${actionBtns}
           </div>
         </div>
       `;
@@ -499,6 +513,26 @@
 
     // ── Init ──────────────────────────────────────────────────────
     if (session) loadMyPasses();
+
+    async function handleCancel(passId) {
+      if (!confirm("Are you sure you want to cancel this exit pass?")) return;
+      const res = await API.cancelExitPass(passId, session.user_id);
+      if (res.success) {
+        UI.toast("Pass cancelled successfully", "success");
+        loadMyPasses();
+      } else {
+        UI.toast(res.error || "Failed to cancel", "error");
+      }
+    }
+
+    async function handleRemind(passId) {
+      const res = await API.remindApprover(passId, session.user_id);
+      if (res.success) {
+        UI.toast("Reminder sent to HR/Approvers", "success");
+      } else {
+        UI.toast(res.error || "Failed to send reminder", "error");
+      }
+    }
   </script>
 </body>
 
