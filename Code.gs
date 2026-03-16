@@ -448,19 +448,36 @@ function createExitPass(body) {
   const normalizedUid = normalizeUserId(user_id);
 
   // ── Validation for Multiple Active Passes ────────────────────
-  const activePass = passRows.find(r => {
+  const nowTime = new Date();
+  let activePass = null;
+
+  for (let i = 0; i < passRows.length; i++) {
+    const r = passRows[i];
     const rUid = normalizeUserId(r[PASS_COLS.user_id - 1]);
+    if (rUid !== normalizedUid) continue;
+
     const approval = r[PASS_COLS.approval_status - 1];
     const movement = r[PASS_COLS.movement_status - 1];
-    
-    // An active pass is any pass that is:
-    // 1. Pending approval OR approved
-    // 2. AND has not been returned, expired, or cancelled
-    const isActiveStatus = (approval === "PENDING" || approval === "APPROVED");
-    const isCompletedMovement = (movement === "RETURNED" || movement === "EXPIRED" || movement === "CANCELLED");
-    
-    return rUid === normalizedUid && isActiveStatus && !isCompletedMovement;
-  });
+    const isCompleted = (movement === "RETURNED" || movement === "EXPIRED" || movement === "CANCELLED" || approval === "REJECTED" || approval === "CANCELLED");
+
+    if (isCompleted) continue;
+
+    if (approval === "PENDING") {
+      const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
+      const ageHours = reqTime ? (nowTime - reqTime) / (1000 * 60 * 60) : 0;
+      
+      // If pending and > 2 hours old today, auto-reject it to allow new request
+      if (ageHours > 2 && isToday(reqTime)) {
+        const rowIndex = i + 2; // +1 for 0-index, +1 for header
+        sheet.getRange(rowIndex, PASS_COLS.approval_status).setValue("REJECTED");
+        sheet.getRange(rowIndex, PASS_COLS.approved_by).setValue("System (Auto-Reject)");
+        continue; // This pass is no longer blocking
+      }
+    }
+
+    activePass = r;
+    break; // Found a valid blocking pass
+  }
 
   if (activePass) {
     const status = activePass[PASS_COLS.movement_status - 1] === "EXITED" ? "currently out" : "an active request";
