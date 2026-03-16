@@ -48,8 +48,9 @@ async function loadAllPasses() {
         let expected = expRes.passes || [];
         let history = logRes.entries || [];
 
-        // Filter: Keep only today's relevant data
+        // Filter: Keep only today's relevant data (Today's calendar date)
         upcoming = upcoming.filter(p => UI.isToday(p.exit_from));
+        expected = expected.filter(p => UI.isToday(p.exit_time));
         history = history.filter(e =>
             (e.exit_time && UI.isToday(e.exit_time)) ||
             (e.return_time && UI.isToday(e.return_time))

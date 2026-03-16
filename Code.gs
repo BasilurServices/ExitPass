@@ -660,8 +660,15 @@ function getPendingPasses(body) {
   const passRows  = getAllRows(passSheet);
   const userMap   = buildUserMap();
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const pending = passRows
-    .filter(r => r[PASS_COLS.approval_status - 1] === "PENDING")
+    .filter(r => {
+      const status = r[PASS_COLS.approval_status - 1];
+      const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
+      return status === "PENDING" && reqTime && reqTime >= today;
+    })
     .map(r => formatPassRow(r, userMap))
     .sort((a, b) => new Date(a.request_time) - new Date(b.request_time));
 
@@ -882,8 +889,21 @@ function getGuardLog(body) {
   const userMap   = buildUserMap();
   const rows      = getAllRows(passSheet);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const moved = rows
-    .filter(r => ["EXITED", "RETURNED"].includes(r[PASS_COLS.movement_status - 1]))
+    .filter(r => {
+      const movement = r[PASS_COLS.movement_status - 1];
+      const isMoved = ["EXITED", "RETURNED"].includes(movement);
+      if (!isMoved) return false;
+      
+      const exitTime = parseDate(r[PASS_COLS.exit_time - 1]);
+      const returnTime = parseDate(r[PASS_COLS.return_time - 1]);
+      
+      // Keep if either exit or return happened today
+      return (exitTime && exitTime >= today) || (returnTime && returnTime >= today);
+    })
     .map(r => formatPassRow(r, userMap))
     .sort((a, b) => {
       const ta = Math.max(new Date(a.exit_time || 0), new Date(a.return_time || 0));
@@ -901,8 +921,16 @@ function getApprovedPasses(body) {
   const passRows  = getAllRows(passSheet);
   const userMap   = buildUserMap();
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const approved = passRows
-    .filter(r => r[PASS_COLS.approval_status - 1] === "APPROVED" && r[PASS_COLS.movement_status - 1] === "NOT_EXITED")
+    .filter(r => {
+      const isApproved = r[PASS_COLS.approval_status - 1] === "APPROVED";
+      const isNotExited = r[PASS_COLS.movement_status - 1] === "NOT_EXITED";
+      const exitFrom = parseDate(r[PASS_COLS.exit_from - 1]);
+      return isApproved && isNotExited && exitFrom && exitFrom >= today;
+    })
     .map(r => formatPassRow(r, userMap))
     .sort((a, b) => new Date(a.exit_from) - new Date(b.exit_from));
 
@@ -915,12 +943,17 @@ function getExpectedReturns(body) {
   const passRows  = getAllRows(passSheet);
   const userMap   = buildUserMap();
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const expected = passRows
-    .filter(r => 
-       r[PASS_COLS.approval_status - 1] === "APPROVED" && 
-       r[PASS_COLS.movement_status - 1] === "EXITED" &&
-       r[PASS_COLS.return_required - 1] !== "No"
-    )
+    .filter(r => {
+       const isApproved = r[PASS_COLS.approval_status - 1] === "APPROVED";
+       const isExited = r[PASS_COLS.movement_status - 1] === "EXITED";
+       const retReq = r[PASS_COLS.return_required - 1] !== "No";
+       const exitTime = parseDate(r[PASS_COLS.exit_time - 1]);
+       return isApproved && isExited && retReq && exitTime && exitTime >= today;
+    })
     .map(r => formatPassRow(r, userMap))
     .sort((a, b) => new Date(a.exit_time || 0) - new Date(b.exit_time || 0));
 
@@ -990,10 +1023,18 @@ function getStats(body) {
     const ap  = String(r[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
     const mv  = String(r[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
     const apt = parseDate(r[PASS_COLS.approval_time - 1]);
+    const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
 
-    if (ap === "PENDING")   pending++;
-    if (mv === "EXITED")    currentlyOut++;
+    // Pending counts all today's pending requests
+    if (ap === "PENDING" && reqTime && reqTime >= today) pending++;
+    
+    // Currently out counts anyone who exited today and hasn't returned
+    if (mv === "EXITED") {
+      const exitTime = parseDate(r[PASS_COLS.exit_time - 1]);
+      if (exitTime && exitTime >= today) currentlyOut++;
+    }
 
+    // Approved/Rejected counts the actions taken today
     if (apt && apt >= today) {
       if (ap === "APPROVED") approvedToday++;
       if (ap === "REJECTED") rejectedToday++;
@@ -1346,13 +1387,24 @@ function autoExpirePasses() {
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const approval = row[PASS_COLS.approval_status - 1];
-    const movement = row[PASS_COLS.movement_status - 1];
+    const approval = String(row[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
+    const movement = String(row[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
     const exitTo   = parseDate(row[PASS_COLS.exit_to - 1]);
+    const reqTime  = parseDate(row[PASS_COLS.request_time - 1]);
 
+    // 1. Auto-expire unused APPROVED passes
     if (approval === "APPROVED" && movement === "NOT_EXITED" && exitTo && nowTime > exitTo) {
       sheet.getRange(i + 1, PASS_COLS.movement_status).setValue("EXPIRED");
       expired++;
+    }
+
+    // 2. Auto-reject stale PENDING passes (more than 2 hours old or from a previous day)
+    if (approval === "PENDING") {
+      const ageHours = reqTime ? (nowTime - reqTime) / (1000 * 60 * 60) : 0;
+      if (!reqTime || !isToday(reqTime) || ageHours > 2) {
+        sheet.getRange(i + 1, PASS_COLS.approval_status).setValue("REJECTED");
+        sheet.getRange(i + 1, PASS_COLS.approved_by).setValue("System (Auto-Reject)");
+      }
     }
     
     // Overdue returns notification

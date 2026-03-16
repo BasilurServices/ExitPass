@@ -13,55 +13,71 @@ A professional, digital solution for managing employee exit passes. This system 
 - **Automatic Expiry**: Safety feature that expires unused passes after the planned return time.
 - **Return Tracking**: Option to specify if a return is required, allowing for one-way or round-trip passes.
 - **Mobile Ready**: Fully responsive design for use on smartphones, tablets, and desktops.
-- **SMS Notifications**: Automated SMS updates to employees for exit pass statuses via Gammu SMS Gateway.
+- **Multi-Channel Notifications**: Automated SMS and Email updates for pass status changes.
 
 ---
 
 ## 👥 Roles & Permissions
 
-The system is built on a robust role-based access control (RBAC) model. Below is a breakdown of what each role can and cannot do:
+The system is built on a robust role-based access control (RBAC) model:
 
 ### 👤 Employee
 *Primary User who initiates the exit workflow.*
-- ✅ **CAN**: Submit new exit pass requests (specifying reason, time, and return requirement).
-- ✅ **CAN**: View their personal pass history and current status.
-- ✅ **CAN**: Access their unique QR code once a pass is approved.
-- ❌ **CANNOT**: Approve or reject any passes.
-- ❌ **CANNOT**: Mark themselves as exited or returned.
-- ❌ **CANNOT**: View other employees' requests or manage users.
+- ✅ **CAN**: Submit new exit pass requests.
+- ✅ **CAN**: View personal pass history with pagination.
+- ✅ **CAN**: Access unique QR codes for approved passes.
+- ✅ **CAN**: Cancel pending requests or send reminders to approvers.
+- ✅ **CAN**: Update personal profile details (Phone/Email).
 
-### 👔 Approver (Manager / Department Head)
+### 👔 Approver (Manager / Dept. Head)
 *Decision-maker responsible for reviewing requests.*
-- ✅ **CAN**: View a real-time list of all PENDING requests.
-- ✅ **CAN**: Approve or Reject requests with their name logged as the approver.
+- ✅ **CAN**: View real-time list of all PENDING requests.
+- ✅ **CAN**: Approve or Reject requests via portal or direct SMS link.
 - ✅ **CAN**: View the status of all passes across the organization.
-- ❌ **CANNOT**: Mark movements (exit/return) at the gate.
-- ❌ **CANNOT**: Modify user profiles or system settings.
 
 ### 🛡️ Guard (Security Personnel)
 *Enforcer of gate security and movement logging.*
-- ✅ **CAN**: Scan QR codes using any device with a camera.
+- ✅ **CAN**: Scan QR codes or manually enter Pass IDs.
 - ✅ **CAN**: Verify if a pass is valid, approved, and not expired.
 - ✅ **CAN**: Mark an employee as **EXITED** or **RETURNED**.
-- ✅ **CAN**: View the **Guard Log** (recent movement history).
-- ✅ **CAN**: Manually enter Pass IDs if the camera is unavailable.
-- ❌ **CANNOT**: Approve or Reject pending pass requests.
-- ❌ **CANNOT**: View sensitive employee data unrelated to the exit.
+- ✅ **CAN**: View the **Guard Log** (filtered for current day's active passes).
 
-### 🏢 HR (Human Resources)
-*User and compliance administrator.*
-- ✅ **CAN**: Do everything an **Approver** can.
-- ✅ **CAN**: **Add, Edit, and Delete** user profiles in the system.
-- ✅ **CAN**: Manage employee roles and department assignments.
-- ✅ **CAN**: Set and reset passwords for administrative users.
-- 🔐 **SECURITY**: Requires a password to log in.
+### 🏢 HR & Admin
+*System administrators.*
+- ✅ **CAN**: Perform all duties of Approvers and Guards.
+- ✅ **CAN**: **Add, Edit, and Delete** user profiles across multiple sheets (Factory/Office).
+- ✅ **CAN**: Manage employee roles and set/reset administrative passwords.
+- 🔐 **SECURITY**: Requires a unique password for entry.
 
-### ⚙️ Admin (System Administrator)
-*Full system controller.*
-- ✅ **CAN**: Access all features and views without restrictions.
-- ✅ **CAN**: Perform HR duties, Approver duties, and Guard duties.
-- ✅ **CAN**: View system-wide statistics and logs.
-- 🔐 **SECURITY**: Requires a password to log in.
+---
+
+## ⚙️ Core Application Logic
+
+The system is governed by several automated business rules to ensure efficiency and data integrity:
+
+### 1. Pass Creation Rules
+- **Single Active Pass Constraint**: An employee cannot create a new request if they already have an "active" pass (Status: `PENDING`, `APPROVED`, or `EXITED`).
+- **Auto-Rejection of Stale Passes**: When a user attempts to create a new request, the system automatically checks for old `PENDING` passes. Any pending pass from a previous day or more than 2 hours old today is auto-rejected to keep the queue clean.
+- **1.5 Hour Return Policy**: By default, the system calculates an "Expected Return Time" exactly **1.5 hours (90 minutes)** from the requested exit time. This serves as the threshold for overdue monitoring.
+- **User ID Normalization**: The system automatically strips leading zeros (e.g., `002` → `2`) and handles case-insensitivity to ensure consistent tracking across different entry formats.
+
+### 2. Guard & Movement Logic
+- **Automated Expiry Check**: When a Guard scans a pass, the system performs a real-time validity check. If the pass is `APPROVED` but the current time has exceeded the "Expected Return Time" (or it's from a previous day), the status is auto-updated to `EXPIRED`.
+- **Duration Tracking & Color Coding**: For employees who have exited, the Guard view tracks the duration of their absence. If the duration exceeds **90 minutes**, the system highlights the entry as **LATE** (Red) to alert security.
+- **Long-Press Override**: Security guards can perform a "Long Press" (800ms) on any pass entry to trigger a manual status override, allowing them to correct accidental exit/return markings.
+- **Smart Filtering & Sorting**: The Guard list dynamically de-duplicates and sorts entries: **Upcoming Exits** (Top) → **Expected Returns** (Middle) → **Today's History** (Bottom).
+- **Movement Hierarchy**: Passes must follow a strict logical flow: `NOT_EXITED` → `EXITED` → `RETURNED`. Once `RETURNED`, the pass lifecycle is closed.
+
+### 3. UI/UX Features
+- **Real-time Clock**: All administrative and guard views feature a synchronized real-time clock and date display in the navigation bar for accurate timestamp verification.
+- **Interactive Reminders**: Employees can send a "Remind Approver" alert for passes pending for more than 30 minutes, keeping the workflow moving.
+- **Paginated Data**: Large logs (History/Admin) are paginated to ensure optimal performance on mobile devices with limited bandwidth.
+
+### 4. Notification Logic
+- **SMS Gateway (Gammu)**: A specialized Python bridge polls the database and sends SMS via a GSM modem.
+    - **Approvers** receive a direct link to approve/reject immediately upon request.
+    - **Employees** receive an SMS with their unique Pass ID and QR link once approved.
+- **Email Automation**: Professional email notifications are sent for every status change, ensuring a traceable audit trail for HR and Management.
 
 ---
 
@@ -90,71 +106,38 @@ graph TD
 | :--- | :--- | :--- |
 | **Frontend** | HTML5, Vanilla CSS, JS | UI and Client-side logic (GitHub Pages) |
 | **Backend** | Google Apps Script | RESTful API and Business Logic |
-| **Database** | Google Sheets | Secure data storage and persistence |
+| **Database** | Google Sheets | Cloud-based data storage and persistence |
 | **QR Engine** | qrcode.js | Client-side QR generation |
 | **Scanner** | jsQR | Browser-based QR scanning |
-| **SMS Gateway** | Python, Gammu | Local service polling Google Sheets and sending SMS via Huawei E3372 GSM modem |
+| **SMS Gateway** | Python, Gammu | Local service polling DB and sending SMS via GSM Modem |
 
 ---
 
 ## 🛠 Setup & Deployment
 
-### 1. Database Setup
-1. Create a new Google Spreadsheet named `BasilurExitPassDB`.
-2. Open **Extensions > Apps Script**.
-3. Paste the contents of `Code.gs` into the script editor.
-4. Run the `setupDatabase()` function from the editor. This will create the `USERS` and `EXIT_PASSES` sheets with correct headers.
-
-### 2. API Deployment
-1. In the Apps Script editor, click **Deploy > New Deployment**.
-2. Select **Web App**.
-3. Set **Execute as: Me** and **Who has access: Anyone**.
-4. Copy the generated **Web App URL**.
-
-### 3. Frontend Configuration
-1. Open `js/config.js` in the project folder.
-2. Replace the `API_URL` value with your Web App URL.
-3. Update `ORG_NAME` and other branding details as needed.
-
-### 4. SMS Gateway Setup (Optional)
-1. Install **Gammu** and Python on a local machine connected to a Huawei E3372 GSM modem.
-2. Install Python dependencies: `pip install -r "SMS Gateway/requirements.txt"` (requires `requests`).
-3. Update `API_URL` in `SMS Gateway/sms_gateway.py` with your Apps Script Web App URL.
-4. Run the gateway: `python "SMS Gateway/sms_gateway.py"`. This script will poll the `SMS_QUEUE` sheet and send messages.
+1. **Database**: Create a Google Sheet and run `setupDatabase()` from the provided `Code.gs`.
+2. **Backend**: Deploy `Code.gs` as a Web App (Execute as: Me, Access: Anyone).
+3. **Frontend**: Update `js/config.js` with your Web App URL and host on GitHub Pages.
+4. **SMS Gateway**: (Optional) Run `sms_gateway.py` on a PC with a connected GSM modem.
 
 ---
 
 ## 📊 Sheet Structure Reference
 
-### USERS Sheet
-| Column | Field | Description |
-| :--- | :--- | :--- |
-| A | user_id | Employee Number (Unique) |
-| B | name | Full Name |
-| C | department | Department |
-| D | role | employee / approver / guard / hr / admin |
-| E | email | Email Address |
-| F | password | Login password (for HR/Admin only) |
+### USERS Sheet (FACTORY_USERS / OFFICE_USERS)
+- `user_id`: Employee Number (Normalized)
+- `name`: Full Name
+- `role`: employee / approver / guard / hr / admin
+- `password`: Admin/HR login password
+- `phone`: Mobile number for SMS
 
 ### EXIT_PASSES Sheet
-| Column | Field | Description |
-| :--- | :--- | :--- |
-| A | pass_id | Unique 6-digit ID (e.g., 100001) |
-| G | approval_status | PENDING / APPROVED / REJECTED |
-| J | movement_status | NOT_EXITED / EXITED / RETURNED / EXPIRED |
-| N | return_required | Yes / No |
-
----
-
-## 🛠 Troubleshooting
-
-- **"User not found"**: Ensure the Employee Number matches exactly what is in the USERS sheet.
-- **"CORS Error"**: Ensure the Apps Script is deployed as "Anyone" and you are using the latest deployment URL.
-- **Scan Issues**: Check camera permissions in your mobile browser. Lighting should be sufficient for the QR code to be clear.
-- **Auto-Expiry**: If a pass expires too soon, check the `exit_to` time provided during the request.
+- `pass_id`: Unique 6-digit ID
+- `approval_status`: PENDING / APPROVED / REJECTED / CANCELLED
+- `movement_status`: NOT_EXITED / EXITED / RETURNED / EXPIRED
+- `exit_to`: Calculated Expected Return Time (1.5h default)
 
 ---
 
 ## 📄 License
-
-This project is licensed under the MIT License. Built for internal organizational use at **Basilur**.
+Internal organizational tool for **Basilur**. Licensed under the MIT License.
