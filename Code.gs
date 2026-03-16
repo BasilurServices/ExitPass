@@ -263,6 +263,17 @@ function loginUser(body) {
     if (password !== storedPassword) {
       return { success: false, error: "Incorrect password." };
     }
+  } else {
+    // For regular users, check password ONLY if one is set in the database
+    const storedPassword = (row[USER_COLS.password - 1] || "").toString().trim();
+    if (storedPassword !== "") {
+      if (!password) {
+        return { success: false, require_password: true, error: "This account is password protected. Please enter your password." };
+      }
+      if (password !== storedPassword) {
+        return { success: false, error: "Incorrect password." };
+      }
+    }
   }
 
   return {
