@@ -456,9 +456,16 @@ function createExitPass(body) {
     const rUid = normalizeUserId(r[PASS_COLS.user_id - 1]);
     if (rUid !== normalizedUid) continue;
 
-    const approval = r[PASS_COLS.approval_status - 1];
-    const movement = r[PASS_COLS.movement_status - 1];
-    const isCompleted = (movement === "RETURNED" || movement === "EXPIRED" || movement === "CANCELLED" || approval === "REJECTED" || approval === "CANCELLED");
+    const approval = String(r[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
+    const movement = String(r[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
+    
+    // Terminal statuses that should NOT block a new request
+    const isCompleted = 
+      movement === "RETURNED" || 
+      movement === "EXPIRED" || 
+      movement === "CANCELLED" || 
+      approval === "REJECTED" || 
+      approval === "CANCELLED";
 
     if (isCompleted) continue;
 
@@ -466,8 +473,10 @@ function createExitPass(body) {
       const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
       const ageHours = reqTime ? (nowTime - reqTime) / (1000 * 60 * 60) : 0;
       
-      // If pending and > 2 hours old today, auto-reject it to allow new request
-      if (ageHours > 2 && isToday(reqTime)) {
+      // Auto-reject any PENDING pass that is:
+      // 1. From a previous day
+      // 2. OR > 2 hours old today
+      if (!isToday(reqTime) || (ageHours > 2 && isToday(reqTime))) {
         const rowIndex = i + 2; // +1 for 0-index, +1 for header
         sheet.getRange(rowIndex, PASS_COLS.approval_status).setValue("REJECTED");
         sheet.getRange(rowIndex, PASS_COLS.approved_by).setValue("System (Auto-Reject)");
@@ -480,8 +489,9 @@ function createExitPass(body) {
   }
 
   if (activePass) {
-    const status = activePass[PASS_COLS.movement_status - 1] === "EXITED" ? "currently out" : "an active request";
-    return { success: false, error: `You already have ${status}. Please complete or cancel it before creating a new one.` };
+    const mStatus = String(activePass[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
+    const statusText = mStatus === "EXITED" ? "currently out" : "an active request";
+    return { success: false, error: `You already have ${statusText}. Please complete or cancel it before creating a new one.` };
   }
 
   const pass_id = generatePassId();
@@ -696,8 +706,8 @@ function approvePass(body) {
   const searchId = String(pass_id).trim();
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][PASS_COLS.pass_id - 1]).trim() === searchId) {
-      if (rows[i][PASS_COLS.approval_status - 1] !== "PENDING") {
-        const currentStatus = rows[i][PASS_COLS.approval_status - 1];
+      const currentStatus = String(rows[i][PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
+      if (currentStatus !== "PENDING") {
         if (currentStatus === "CANCELLED") {
           return { success: false, error: "This pass has been cancelled by the user." };
         }
@@ -747,8 +757,8 @@ function verifyPass(body) {
       // ── Expiry Check ──────────────────────────────────────────
       const exitFrom = parseDate(row[PASS_COLS.exit_from - 1]);
       const exitTo   = parseDate(row[PASS_COLS.exit_to - 1]);
-      const movement = row[PASS_COLS.movement_status - 1];
-      const approval = row[PASS_COLS.approval_status - 1];
+      const movement = String(row[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
+      const approval = String(row[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
       const now      = new Date();
 
       let isExpired = false;
@@ -795,8 +805,8 @@ function updateMovementStatus(body) {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (String(row[PASS_COLS.pass_id - 1]).trim() === searchId) {
-      const currentMovement = row[PASS_COLS.movement_status - 1];
-      const approval        = row[PASS_COLS.approval_status - 1];
+      const currentMovement = String(row[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
+      const approval        = String(row[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
 
       // Must be approved
       if (approval !== "APPROVED") {
@@ -977,8 +987,8 @@ function getStats(body) {
   let currentlyOut  = 0;
 
   rows.forEach(r => {
-    const ap  = r[PASS_COLS.approval_status - 1];
-    const mv  = r[PASS_COLS.movement_status - 1];
+    const ap  = String(r[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
+    const mv  = String(r[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
     const apt = parseDate(r[PASS_COLS.approval_time - 1]);
 
     if (ap === "PENDING")   pending++;
@@ -1763,7 +1773,7 @@ function cancelExitPass(body) {
         return { success: false, error: "You are not authorized to cancel this pass." };
       }
 
-      const currentStatus = rows[i][PASS_COLS.approval_status - 1];
+      const currentStatus = String(rows[i][PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
       if (currentStatus !== "PENDING") {
         return { success: false, error: "Only pending passes can be cancelled." };
       }
@@ -1792,7 +1802,7 @@ function remindApprover(body) {
         return { success: false, error: "You are not authorized to send reminders for this pass." };
       }
 
-      const status = rows[i][PASS_COLS.approval_status - 1];
+      const status = String(rows[i][PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
       if (status !== "PENDING") {
         return { success: false, error: "Can only remind for pending requests." };
       }
