@@ -452,13 +452,19 @@ function createExitPass(body) {
     const rUid = normalizeUserId(r[PASS_COLS.user_id - 1]);
     const approval = r[PASS_COLS.approval_status - 1];
     const movement = r[PASS_COLS.movement_status - 1];
-    return rUid === normalizedUid && 
-           (approval === "PENDING" || approval === "APPROVED") && 
-           (movement !== "RETURNED" && movement !== "EXPIRED");
+    
+    // An active pass is any pass that is:
+    // 1. Pending approval OR approved
+    // 2. AND has not been returned, expired, or cancelled
+    const isActiveStatus = (approval === "PENDING" || approval === "APPROVED");
+    const isCompletedMovement = (movement === "RETURNED" || movement === "EXPIRED" || movement === "CANCELLED");
+    
+    return rUid === normalizedUid && isActiveStatus && !isCompletedMovement;
   });
 
   if (activePass) {
-    return { success: false, error: "You already have an active exit pass. Please complete or cancel it before creating a new one." };
+    const status = activePass[PASS_COLS.movement_status - 1] === "EXITED" ? "currently out" : "an active request";
+    return { success: false, error: `You already have ${status}. Please complete or cancel it before creating a new one.` };
   }
 
   const pass_id = generatePassId();

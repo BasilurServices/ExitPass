@@ -298,12 +298,6 @@
       const hours = String(now.getHours()).padStart(2, '0');
       const mins = String(now.getMinutes()).padStart(2, '0');
       document.getElementById("exit-from").value = `${hours}:${mins}`;
-
-      // Default return time + 2 hours
-      const later = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const lHours = String(later.getHours()).padStart(2, '0');
-      const lMins = String(later.getMinutes()).padStart(2, '0');
-      document.getElementById("exit-to").value = `${lHours}:${lMins}`;
     }
     setDefaultTimes();
 
@@ -315,19 +309,6 @@
 
     // ── Show/hide Return Time field based on Return Required ──────
     document.getElementById("return-required").addEventListener("change", function () {
-      // Logic removed: Return time is now hidden by default as per request
-      /*
-      const returnGroup = document.getElementById("return-to-group");
-      const returnInput = document.getElementById("exit-to");
-      if (this.value === "No") {
-        UI.hide(returnGroup);
-        returnInput.required = false;
-        returnInput.value = "";
-      } else {
-        UI.show(returnGroup);
-        returnInput.required = true;
-      }
-      */
     });
 
     // ── Submit Request ────────────────────────────────────────────
@@ -339,18 +320,14 @@
       const reason = reasonSelect === "Other" ? (otherReason || "Other") : reasonSelect;
       const return_required = document.getElementById("return-required").value;
       const time_from = document.getElementById("exit-from").value;
-      const time_to = document.getElementById("exit-to").value;
       const phone = document.getElementById("phone").value.trim();
 
       const now = new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const exit_from = `${todayStr}T${time_from}:00`;
-      const exit_to = return_required === "Yes" ? `${todayStr}T${time_to}:00` : "";
-
-      if (return_required === "Yes" && time_to <= time_from) {
-        UI.toast("Return time must be after exit time.", "error");
-        return;
-      }
+      
+      // We no longer send exit_to from frontend; backend handles the 1.5 hour auto-calculation
+      const exit_to = "";
 
       UI.setButtonLoading(btn, true);
       const res = await API.createExitPass({
@@ -367,6 +344,7 @@
         UI.toast("Exit pass submitted successfully!", "success");
         e.target.reset();
         document.getElementById("other-reason-group").classList.add("hidden");
+        setDefaultTimes(); // Reset to current time
 
         // Update local session if phone changed
         if (phone) {
@@ -417,7 +395,7 @@
         return;
       }
 
-      list.innerHTML = res.passes.map(pass => {
+      list.innerHTML = res.passes.map((pass, index) => {
         const tr = UI.timeRemaining(pass.exit_to);
         const timeChip = pass.approval_status === "APPROVED" && pass.movement_status === "NOT_EXITED"
           ? `<span class="time-remaining ${tr.expired ? 'time-expired' : 'time-ok'}">${tr.text}</span>`
@@ -430,15 +408,18 @@
           !isOverdue;
 
         let actionBtns = "";
+        // Only show "Remind" for the most recent Pending pass (index 0 on page 1)
         if (pass.approval_status === "PENDING") {
           const reqTime = new Date(pass.request_time);
           const now = new Date();
           const diffMins = (now - reqTime) / (60 * 1000);
-          const remindDisabled = diffMins < 30;
+          
+          const isMostRecent = (currentPage === 1 && index === 0);
+          const showRemind = isMostRecent && diffMins >= 30 && diffMins <= 120; // 30 mins to 2 hours
           
           actionBtns = `
             <button class="btn btn--danger btn--sm" onclick="event.stopPropagation(); handleCancel('${pass.pass_id}')">✕ Cancel</button>
-            <button class="btn btn--amber btn--sm" ${remindDisabled ? 'disabled title="Available after 30 mins"' : ''} onclick="event.stopPropagation(); handleRemind('${pass.pass_id}')">🔔 Remind</button>
+            ${showRemind ? `<button class="btn btn--amber btn--sm" onclick="event.stopPropagation(); handleRemind('${pass.pass_id}')">🔔 Remind</button>` : ""}
           `;
         }
 
@@ -457,6 +438,7 @@
           <div class="pass-card__meta">
             <span>🕐 Exp. Exit: ${UI.formatDateTime(pass.exit_from)}</span>
             ${pass.exit_time ? `<span>🚪 Actual Exit: ${UI.formatDateTime(pass.exit_time)}</span>` : ""}
+            ${pass.movement_status === "EXITED" && pass.return_required !== "No" ? `<span class="time-ok" style="padding:2px 6px; border-radius:4px;">🏠 Exp. Return: ${UI.formatDateTime(pass.exit_to)}</span>` : ""}
             ${pass.return_time ? `<span>🏠 Actual Return: ${UI.formatDateTime(pass.return_time)}</span>` : ""}
             ${pass.approved_by ? `<span>✅ ${pass.approved_by}</span>` : ""}
           </div>
@@ -477,9 +459,9 @@
         const totalPages = Math.ceil(total / limit);
 
         if (totalPages > 1) {
-          paginationInfo.textContent = `Page ${page} of ${totalPages} (${total} total)`;
-          prevBtn.disabled = page === 1;
-          nextBtn.disabled = page === totalPages;
+          paginationInfo.textContent = `Page ${currentPage} of ${totalPages} (${total} total)`;
+          prevBtn.disabled = currentPage === 1;
+          nextBtn.disabled = currentPage === totalPages;
           UI.show(pagination);
         } else {
           UI.hide(pagination);
