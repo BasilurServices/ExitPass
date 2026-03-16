@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="logo.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Approver Dashboard | Basilur Exit Pass</title>
+  <link rel="stylesheet" href="css/style.css?v=2.0">
+  <style>
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+      width: fit-content;
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      padding: 8px 20px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--premium-blue);
+      color: #fff;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .approve-actions-cell {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pending-count {
+      background: var(--red);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar input,
+    .filter-bar select {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .filter-bar input:focus,
+    .filter-bar select:focus {
+      border-color: var(--amber-dim);
+    }
+
+    .filter-bar select option {
+      background: var(--bg-panel);
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="topbar">
+    <a href="index.html" class="topbar__logo">
+      <div class="topbar__logo-container">
+        <img src="logo.png" alt="Basilur Logo" class="topbar__logo-img">
+      </div>
+      <span class="topbar__logo-text">BASILUR <span>EXIT PASS</span></span>
+    </a>
+    <div class="topbar__right">
+      <div class="topbar__user">
+        <span id="user-name">Loading…</span>
+        <span id="user-dept" style="color:var(--text-muted);font-size:12px;"></span>
+        <span id="user-role" class="topbar__role-badge role--approver">APPROVER</span>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="logout-btn">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="container">
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-header__eyebrow">Basilur Management Dashboard</div>
+        <h1 class="page-header__title">Pass Management</h1>
+        <p class="page-header__sub">Review and approve employee exit requests</p>
+      </div>
+
+      <!-- PENDING SECTION -->
+      <div id="pending-section" style="margin-bottom: 32px;">
+        <div class="card">
+          <div class="card__header">
+            <h2 class="card__title">Pending Approvals <span class="pending-count" id="pending-badge">0</span></h2>
+            <button class="btn btn--ghost btn--sm" onclick="loadPending()">↺ Refresh</button>
+          </div>
+
+          <div id="pending-loading" class="loading-overlay">
+            <div class="spinner"></div> Loading pending passes…
+          </div>
+
+          <div id="pending-empty" class="empty-state hidden">
+            <div class="empty-state__icon">✅</div>
+            <div class="empty-state__title">All clear!</div>
+            <p>No passes waiting for your review.</p>
+          </div>
+
+          <div class="table-wrap hidden" id="pending-table-wrap">
+            <table id="pending-table">
+              <thead>
+                <tr>
+                  <th>Pass ID</th>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th>Reason</th>
+                  <th>Exit From</th>
+                  <th>Return Required</th>
+                  <th>Return By</th>
+                  <th>Requested</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pending-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card stat-card--amber">
+          <div class="stat-card__label">Pending</div>
+          <div class="stat-card__value" id="stat-pending">—</div>
+          <div class="stat-card__icon">⏳</div>
+        </div>
+        <div class="stat-card stat-card--green">
+          <div class="stat-card__label">Approved Today</div>
+          <div class="stat-card__value" id="stat-approved">—</div>
+          <div class="stat-card__icon">✅</div>
+        </div>
+        <div class="stat-card stat-card--red">
+          <div class="stat-card__label">Rejected Today</div>
+          <div class="stat-card__value" id="stat-rejected">—</div>
+          <div class="stat-card__icon">✕</div>
+        </div>
+        <div class="stat-card stat-card--blue">
+          <div class="stat-card__label">Currently Out</div>
+          <div class="stat-card__value" id="stat-out">—</div>
+          <div class="stat-card__icon">🚶</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="history">All Passes</button>
+        <!-- Only show Users tab for hr/admin/approver -->
+        <button class="tab-btn" data-tab="users">Users</button>
+      </div>
+
+      <!-- HISTORY TAB -->
+      <div class="tab-panel active" id="tab-history">
+        <div class="card">
+          <div class="card__header">
+            <h2 class="card__title">All Passes</h2>
+            <button class="btn btn--ghost btn--sm" onclick="loadHistory()">↺ Refresh</button>
+          </div>
+
+          <div class="filter-bar">
+            <input type="text" id="search-input" placeholder="Search by name, ID, reason…"
+              style="flex:1;min-width:200px;" />
+            <select id="status-filter">
+              <option value="">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
+
+          <div id="history-loading" class="loading-overlay hidden">
+            <div class="spinner"></div> Loading history…
+          </div>
+
+          <div id="history-empty" class="empty-state hidden">
+            <div class="empty-state__icon">📋</div>
+            <div class="empty-state__title">No passes found</div>
+            <p>No matching records.</p>
+          </div>
+
+          <div class="table-wrap hidden" id="history-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pass ID</th>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th>Reason</th>
+                  <th>Exit From</th>
+                  <th>Return By</th>
+                  <th>Return Required</th>
+                  <th>Approval</th>
+                  <th>Movement</th>
+                  <th>Approved By</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody"></tbody>
+            </table>
+          </div>
+
+          <div id="history-pagination" class="pagination hidden">
+            <button class="btn btn--ghost btn--sm pagination__btn" id="hist-prev-btn" onclick="changeHistPage(-1)">← Prev</button>
+            <div class="pagination__info" id="hist-pagination-info">Page 1 of 1</div>
+            <button class="btn btn--ghost btn--sm pagination__btn" id="hist-next-btn" onclick="changeHistPage(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS TAB -->
+      <div class="tab-panel" id="tab-users">
+        <div class="card">
+          <div class="card__header">
+            <h2 class="card__title">User Management</h2>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn--primary btn--sm" onclick="showAddUserModal()">+ Add User</button>
+              <button class="btn btn--ghost btn--sm" onclick="loadUsers()">↺ Refresh</button>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <input type="text" id="user-search-input" placeholder="Search by name, ID, role…"
+              style="flex:1;min-width:200px;" />
+            <select id="user-role-filter">
+              <option value="">All Roles</option>
+              <option value="employee">Employee</option>
+              <option value="approver">Approver</option>
+              <option value="hr">HR</option>
+              <option value="guard">Guard</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div id="users-loading" class="loading-overlay hidden">
+            <div class="spinner"></div> Loading users…
+          </div>
+
+          <div id="users-empty" class="empty-state hidden">
+            <div class="empty-state__icon">👤</div>
+            <div class="empty-state__title">No users found</div>
+            <p>Try clearing your search filters.</p>
+          </div>
+
+          <div class="table-wrap hidden" id="users-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee No</th>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div id="add-user-modal" class="modal-backdrop hidden" style="z-index: 9999;">
+    <div class="modal">
+      <div class="modal__header">
+        <h3 class="card__title">Add New User</h3>
+      </div>
+      <div class="modal__body" style="padding-bottom: 0;">
+        <form id="add-user-form" style="display: flex; flex-direction: column; gap: 12px;"
+          onsubmit="event.preventDefault(); submitAddUser();">
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Employee
+              Number *</label>
+            <input type="text" id="add-user-id" required
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;" />
+          </div>
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Full
+              Name *</label>
+            <input type="text" id="add-user-name" required
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;" />
+          </div>
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Department</label>
+            <input type="text" id="add-user-dept" placeholder="e.g. IT, HR, Operations"
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;" />
+          </div>
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Role
+              *</label>
+            <select id="add-user-role" required
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;">
+              <option value="employee">Employee</option>
+              <option value="approver">Approver</option>
+              <option value="hr">HR</option>
+              <option value="guard">Guard</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Email</label>
+            <input type="email" id="add-user-email"
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;" />
+          </div>
+          <div>
+            <label
+              style="display:block; font-size:12px; font-weight:bold; color:var(--text-secondary); margin-bottom:4px;">Password
+              (Optional)</label>
+            <input type="password" id="add-user-pwd" placeholder="Leave blank to keep unchanged"
+              style="width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text-primary); outline:none;" />
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer" style="margin-top:20px; display: flex; justify-content: space-between;">
+        <div>
+          <button class="btn btn--danger btn--sm" id="edit-user-delete-btn" type="button" style="display: none;"
+            onclick="handleDeleteFromModal()">🗑️ Delete User</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn--ghost" type="button" onclick="hideAddUserModal()">Cancel</button>
+          <button class="btn btn--primary" id="add-user-submit" type="button" onclick="submitAddUser()">Save
+            User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval Modal -->
+  <div id="approve-modal" class="modal-backdrop hidden" style="z-index: 9999;">
+    <div class="modal">
+      <div class="modal__header">
+        <h3 class="card__title">Approve Exit Pass</h3>
+      </div>
+      <div class="modal__body" id="approve-modal-body">
+        <!-- Content injected here -->
+      </div>
+      <div class="modal__footer" style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="btn btn--ghost" onclick="hideApproveModal()">Cancel</button>
+        <button class="btn btn--danger" id="modal-reject-btn" style="display: none;">Reject</button>
+        <button class="btn btn--success" id="modal-approve-btn" style="display: none;">Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    // ── Auth Guard ─────────────────────────────────────────────────
+    const session = Auth.requireAuth(["approver", "admin", "hr"]);
+    if (session) {
+      UI.renderTopbarUser(session);
+      UI.bindLogout();
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────────
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        this.classList.add("active");
+        document.getElementById("tab-" + this.dataset.tab).classList.add("active");
+        if (this.dataset.tab === "history" && !historyLoaded) loadHistory();
+        if (this.dataset.tab === "users" && !usersLoaded) loadUsers();
+      });
+    });
+    let historyLoaded = false;
+    let usersLoaded = false;
+
+    // ── Load Stats ────────────────────────────────────────────────
+    async function loadStats() {
+      const res = await API.getStats();
+      if (res.success) {
+        document.getElementById("stat-approved").textContent = res.approvedToday ?? "—";
+        document.getElementById("stat-rejected").textContent = res.rejectedToday ?? "—";
+      }
+
+      // Compute Currently Out dynamically on frontend to filter out previous days
+      const hist = await API.getAllPasses(100);
+      if (hist.success) {
+        const outToday = hist.passes.filter(p => p.movement_status === "EXITED" && UI.isToday(p.exit_from)).length;
+        document.getElementById("stat-out").textContent = outToday;
+      }
+    }
+
+    // ── Load Pending ──────────────────────────────────────────────
+    async function loadPending() {
+      const loading = document.getElementById("pending-loading");
+      const empty = document.getElementById("pending-empty");
+      const wrap = document.getElementById("pending-table-wrap");
+      const tbody = document.getElementById("pending-tbody");
+
+      UI.show(loading);
+      UI.hide(empty);
+      UI.hide(wrap);
+
+      const res = await API.getPendingPasses();
+      UI.hide(loading);
+
+      let passes = res.passes || [];
+      // Filter: only show today's requests or exits
+      passes = passes.filter(p => UI.isToday(p.exit_from) || UI.isToday(p.request_time));
+
+      document.getElementById("pending-badge").textContent = passes.length;
+      document.getElementById("stat-pending").textContent = passes.length;
+
+      if (!res.success || passes.length === 0) {
+        UI.show(empty);
+        return;
+      }
+
+      tbody.innerHTML = passes.map(p => `
+      <tr>
+        <td><span class="td-mono">${p.pass_id}</span></td>
+        <td><span class="td-primary">${p.employee_name || "—"}</span></td>
+        <td class="text-secondary">${p.department || "—"}</td>
+        <td>${p.reason}</td>
+        <td class="text-secondary">${UI.formatDateTime(p.exit_from)}</td>
+        <td class="text-secondary">${p.return_required === 'No' ? '<span class="badge badge--expired">No</span>' : '<span class="badge badge--approved">Yes</span>'}</td>
+        <td class="text-secondary">${p.return_required === 'No' ? '—' : UI.formatDateTime(p.exit_to)}</td>
+        <td class="text-secondary">${UI.formatDateTime(p.request_time)}</td>
+        <td>
+          <div class="approve-actions-cell">
+            <button class="btn btn--success btn--sm" onclick="handleApprove('${p.pass_id}', 'APPROVED')">✓ Approve</button>
+            <button class="btn btn--danger btn--sm"  onclick="handleApprove('${p.pass_id}', 'REJECTED')">✕ Reject</button>
+          </div>
+        </td>
+      </tr>
+    `).join("");
+      UI.show(wrap);
+    }
+
+    // ── Approve / Reject ──────────────────────────────────────────
+    async function handleApprove(passId, status, skipConfirm = false) {
+      const action = status === "APPROVED" ? "approve" : "reject";
+
+      if (!skipConfirm) {
+        const confirmed = await UI.confirm(
+          `${status === "APPROVED" ? "Approve" : "Reject"} Pass`,
+          `Are you sure you want to ${action} pass <strong>${passId}</strong>?`
+        );
+        if (!confirmed) return;
+      }
+
+      const row = document.querySelector(`button[onclick*="'${passId}'"]`)?.closest("tr");
+      if (row) {
+        row.style.opacity = "0.4";
+        row.querySelectorAll('button').forEach(btn => btn.disabled = true);
+      }
+
+      const res = await API.approvePass({
+        pass_id: passId,
+        status,
+        approver_name: session.name,
+      });
+
+      if (res.success) {
+        UI.toast(`Pass ${passId} ${status.toLowerCase()}!`, status === "APPROVED" ? "success" : "warning");
+        loadPending();
+        loadStats();
+      } else {
+        UI.toast(res.error || "Action failed. Please retry.", "error");
+
+        if (res.error && res.error.includes("already been processed")) {
+          loadPending();
+          loadStats();
+          return;
+        }
+
+        if (row) {
+          row.style.opacity = "1";
+          row.querySelectorAll('button').forEach(btn => btn.disabled = false);
+        }
+      }
+    }
+
+    // ── Load History ──────────────────────────────────────────────
+    let currentHistPage = 1;
+    const histPageSize = 5;
+
+    async function loadHistory(page = 1) {
+      currentHistPage = page;
+      historyLoaded = true;
+      const offset = (page - 1) * histPageSize;
+
+      const loading = document.getElementById("history-loading");
+      const empty = document.getElementById("history-empty");
+      const wrap = document.getElementById("history-table-wrap");
+      const tbody = document.getElementById("history-tbody");
+      const pagination = document.getElementById("history-pagination");
+      const paginationInfo = document.getElementById("hist-pagination-info");
+      const prevBtn = document.getElementById("hist-prev-btn");
+      const nextBtn = document.getElementById("hist-next-btn");
+
+      UI.show(loading);
+      UI.hide(empty);
+      UI.hide(wrap);
+      UI.hide(pagination);
+
+      const res = await API.getAllPasses(histPageSize, offset);
+      UI.hide(loading);
+
+      if (!res.success || !res.passes || res.passes.length === 0) {
+        if (page === 1) {
+          UI.show(empty);
+        } else {
+          loadHistory(page - 1);
+        }
+        return;
+      }
+
+      allPasses = res.passes || [];
+      renderHistory(allPasses);
+
+      // Handle Pagination UI
+      if (res.pagination) {
+        const { total, limit, offset } = res.pagination;
+        const totalPages = Math.ceil(total / limit);
+
+        if (totalPages > 1) {
+          paginationInfo.textContent = `Page ${page} of ${totalPages} (${total} total)`;
+          prevBtn.disabled = page === 1;
+          nextBtn.disabled = page === totalPages;
+          UI.show(pagination);
+        } else {
+          UI.hide(pagination);
+        }
+      }
+    }
+
+    function changeHistPage(delta) {
+      loadHistory(currentHistPage + delta);
+    }
+
+    let allPasses = [];
+
+    function renderHistory(passes) {
+      const empty = document.getElementById("history-empty");
+      const wrap = document.getElementById("history-table-wrap");
+      const tbody = document.getElementById("history-tbody");
+
+      if (!passes || passes.length === 0) {
+        UI.show(empty);
+        UI.hide(wrap);
+        return;
+      }
+
+      tbody.innerHTML = passes.map(p => `
+      <tr>
+        <td><span class="td-mono">${p.pass_id}</span></td>
+        <td><span class="td-primary">${p.employee_name || "—"}</span></td>
+        <td class="text-secondary">${p.department || "—"}</td>
+        <td>${p.reason}</td>
+        <td class="text-secondary">${UI.formatDateTime(p.exit_from)}</td>
+        <td class="text-secondary">${p.return_required === 'No' ? '—' : UI.formatDateTime(p.exit_to)}</td>
+        <td class="text-secondary">${p.return_required === 'No' ? 'No' : 'Yes'}</td>
+        <td>${UI.statusBadge(p.approval_status)}</td>
+        <td>${UI.statusBadge(p.movement_status)}</td>
+        <td class="text-secondary">${p.approved_by || "—"}</td>
+      </tr>
+    `).join("");
+      UI.hide(empty);
+      UI.show(wrap);
+    }
+
+    // ── Search & Filter ───────────────────────────────────────────
+    function applyFilters() {
+      const q = document.getElementById("search-input").value.toLowerCase();
+      const status = document.getElementById("status-filter").value;
+      const filtered = allPasses.filter(p => {
+        const matchQ = !q ||
+          p.pass_id?.toLowerCase().includes(q) ||
+          p.reason?.toLowerCase().includes(q) ||
+          p.employee_name?.toLowerCase().includes(q);
+        const matchS = !status || p.approval_status === status;
+        return matchQ && matchS;
+      });
+      renderHistory(filtered);
+    }
+
+    document.getElementById("search-input").addEventListener("input", applyFilters);
+    document.getElementById("status-filter").addEventListener("change", applyFilters);
+
+    // ── Load & Manage Users ───────────────────────────────────────
+    let allUsers = [];
+
+    async function loadUsers() {
+      usersLoaded = true;
+      const loading = document.getElementById("users-loading");
+      const empty = document.getElementById("users-empty");
+      const wrap = document.getElementById("users-table-wrap");
+
+      UI.show(loading);
+      UI.hide(empty);
+      UI.hide(wrap);
+
+      const res = await API.getAllUsers();
+      UI.hide(loading);
+
+      if (res.success) {
+        allUsers = res.users || [];
+        renderUsers(allUsers);
+      } else {
+        UI.toast("Failed to load users", "error");
+        UI.show(empty);
+      }
+    }
+
+    function renderUsers(users) {
+      const empty = document.getElementById("users-empty");
+      const wrap = document.getElementById("users-table-wrap");
+      const tbody = document.getElementById("users-tbody");
+
+      if (!users || users.length === 0) {
+        UI.show(empty);
+        UI.hide(wrap);
+        return;
+      }
+
+      const canDelete = session && (session.role === 'admin' || session.role === 'hr' || (session.department && session.department.toLowerCase() === 'hr'));
+
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td><span class="td-mono">${u.user_id}</span></td>
+          <td><span class="td-primary">${u.name}</span></td>
+          <td class="text-secondary">${u.department || "—"}</td>
+          <td>${getRoleBadge(u.role)}</td>
+          <td class="text-secondary">${u.email || "—"}</td>
+          <td>
+            <div class="approve-actions-cell">
+              <button class="btn btn--ghost btn--sm" onclick="editUserModal('${u.user_id}')">✏️ Edit</button>
+              ${canDelete ? `<button class="btn btn--danger btn--sm" onclick="handleDeleteUser('${u.user_id}', '${(u.name || "").replace(/'/g, "\\'")}')">🗑️ Delete</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+
+      UI.hide(empty);
+      UI.show(wrap);
+    }
+
+    function getRoleBadge(role) {
+      const r = (role || "").toLowerCase();
+      let colorClass = "";
+      if (r === "admin" || r === "hr") colorClass = "role--admin";
+      else if (r === "approver") colorClass = "role--approver";
+      else if (r === "guard") colorClass = "role--guard";
+      else colorClass = "role--employee";
+      return `<span class="topbar__role-badge ${colorClass}" style="position:static;font-size:10px;">${r.toUpperCase()}</span>`;
+    }
+
+    function applyUserFilters() {
+      const q = document.getElementById("user-search-input").value.toLowerCase();
+      const role = document.getElementById("user-role-filter").value.toLowerCase();
+
+      const filtered = allUsers.filter(u => {
+        const matchQ = !q ||
+          u.user_id?.toLowerCase().includes(q) ||
+          u.name?.toLowerCase().includes(q) ||
+          u.department?.toLowerCase().includes(q);
+        const matchRole = !role || (u.role || "").toLowerCase() === role;
+        return matchQ && matchRole;
+      });
+      renderUsers(filtered);
+    }
+
+    document.getElementById("user-search-input").addEventListener("input", applyUserFilters);
+    document.getElementById("user-role-filter").addEventListener("change", applyUserFilters);
+
+    // ── Add User Modal ──────────────────────────────────────────────
+    let isEditMode = false;
+
+    function showAddUserModal() {
+      isEditMode = false;
+      document.getElementById("add-user-form").reset();
+      document.getElementById("add-user-modal").querySelector(".card__title").textContent = "Add New User";
+      document.getElementById("add-user-id").disabled = false;
+      document.getElementById("add-user-submit").textContent = "Save User";
+      document.getElementById("edit-user-delete-btn").style.display = "none";
+      UI.show(document.getElementById("add-user-modal"));
+    }
+
+    function editUserModal(userId) {
+      const u = allUsers.find(x => x.user_id == userId);
+      if (!u) return;
+      isEditMode = true;
+      document.getElementById("add-user-form").reset();
+      document.getElementById("add-user-modal").querySelector(".card__title").textContent = "Edit User";
+      document.getElementById("add-user-submit").textContent = "Update User";
+
+      document.getElementById("add-user-id").value = u.user_id;
+      document.getElementById("add-user-id").disabled = true; // Cannot edit ID
+      document.getElementById("add-user-name").value = u.name;
+      document.getElementById("add-user-dept").value = u.department || "";
+      document.getElementById("add-user-role").value = u.role || "employee";
+      document.getElementById("add-user-email").value = u.email || "";
+      document.getElementById("add-user-pwd").value = "";
+
+      const canDelete = session && (session.role === 'admin' || session.role === 'hr' || (session.department && session.department.toLowerCase() === 'hr'));
+      const delBtn = document.getElementById("edit-user-delete-btn");
+      if (canDelete) {
+        delBtn.style.display = "block";
+      } else {
+        delBtn.style.display = "none";
+      }
+
+      UI.show(document.getElementById("add-user-modal"));
+    }
+
+    function handleDeleteFromModal() {
+      const userId = document.getElementById("add-user-id").value;
+      const userName = document.getElementById("add-user-name").value;
+      hideAddUserModal();
+      handleDeleteUser(userId, userName);
+    }
+
+    async function handleDeleteUser(userId, userName) {
+      const normalizedId = Auth.normalizeUserId(userId);
+      const confirmed = await UI.confirm(
+        "Delete User",
+        `Are you sure you want to delete user <strong>${userName}</strong> (${normalizedId})?<br><br><span style="color:var(--red); font-weight:bold;">This action cannot be undone.</span>`
+      );
+      if (!confirmed) return;
+
+      const res = await API.deleteUser(normalizedId);
+      if (res.success) {
+        UI.toast("User deleted successfully!", "success");
+        loadUsers();
+      } else {
+        UI.toast(res.error || "Failed to delete user", "error");
+      }
+    }
+
+    function hideAddUserModal() {
+      UI.hide(document.getElementById("add-user-modal"));
+    }
+
+    async function submitAddUser() {
+      const idInput = Auth.normalizeUserId(document.getElementById("add-user-id").value);
+      const nameInput = document.getElementById("add-user-name").value.trim();
+      if (!idInput || !nameInput) {
+        UI.toast("Employee Number and Name are required", "error");
+        return;
+      }
+
+      const btn = document.getElementById("add-user-submit");
+      UI.setButtonLoading(btn, true);
+
+      const userObj = {
+        user_id: idInput,
+        name: nameInput,
+        department: document.getElementById("add-user-dept").value.trim(),
+        role: document.getElementById("add-user-role").value,
+        email: document.getElementById("add-user-email").value.trim(),
+        password: document.getElementById("add-user-pwd").value
+      };
+
+      let res;
+      if (isEditMode) {
+        res = await API.editUser(userObj);
+      } else {
+        res = await API.addUser(userObj);
+      }
+
+      UI.setButtonLoading(btn, false);
+
+      if (res.success) {
+        UI.toast(isEditMode ? "User updated successfully!" : "User added successfully!", "success");
+        hideAddUserModal();
+        loadUsers(); // Refresh list
+      } else {
+        UI.toast(res.error || "Failed to save user", "error");
+      }
+    }
+
+    // ── Popup Approval ──────────────────────────────────────────────
+    async function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const passId = params.get("id");
+      if (passId && session) {
+        // Short delay to let regular loading finish or just show it immediately
+        showApprovePopup(passId);
+      }
+    }
+
+    async function showApprovePopup(passId) {
+      const modal = document.getElementById("approve-modal");
+      const body = document.getElementById("approve-modal-body");
+
+      document.getElementById("modal-approve-btn").style.display = "none";
+      document.getElementById("modal-reject-btn").style.display = "none";
+
+      body.innerHTML = `<div class="loading-overlay" style="position:static;height:100px;"><div class="spinner"></div> Loading details…</div>`;
+      UI.show(modal);
+
+      const res = await API.verifyPass(passId);
+      if (!res.success) {
+        body.innerHTML = `<div class="alert alert--error"><span class="alert__icon">⚠</span><span>${res.error || "Pass not found."}</span></div>`;
+        return;
+      }
+
+      const p = res.pass;
+
+      // If already processed, show status instead of buttons
+      if (p.approval_status !== "PENDING") {
+        body.innerHTML = `
+          <div class="alert alert--info" style="margin-bottom:16px;">
+            This pass has already been <strong>${p.approval_status}</strong>.
+          </div>
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Employee</div>
+            <div style="font-size: 16px; font-weight: 700;">${p.employee_name || '—'} (${p.user_id})</div>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Reason</div>
+            <div style="font-size: 14px;">${p.reason}</div>
+          </div>
+        `;
+        document.getElementById("modal-approve-btn").style.display = "none";
+        document.getElementById("modal-reject-btn").style.display = "none";
+        return;
+      }
+
+      body.innerHTML = `
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Employee</div>
+          <div style="font-size: 16px; font-weight: 700;">${p.employee_name || '—'} (${p.user_id})</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Department</div>
+          <div style="font-size: 14px;">${p.department || '—'}</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Reason</div>
+          <div style="font-size: 14px;">${p.reason}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Exit Time</div>
+            <div style="font-size: 13px;">${UI.formatDateTime(p.exit_from)}</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Return By</div>
+            <div style="font-size: 13px;">${p.return_required === 'No' ? 'No Return' : UI.formatDateTime(p.exit_to)}</div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("modal-approve-btn").style.display = "block";
+      document.getElementById("modal-reject-btn").style.display = "block";
+
+      document.getElementById("modal-approve-btn").onclick = async () => {
+        const btnA = document.getElementById("modal-approve-btn");
+        const btnR = document.getElementById("modal-reject-btn");
+        UI.setButtonLoading(btnA, true);
+        btnR.disabled = true;
+
+        await handleApprove(passId, 'APPROVED', true);
+
+        UI.setButtonLoading(btnA, false);
+        btnR.disabled = false;
+        hideApproveModal();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      };
+
+      document.getElementById("modal-reject-btn").onclick = async () => {
+        const btnA = document.getElementById("modal-approve-btn");
+        const btnR = document.getElementById("modal-reject-btn");
+        UI.setButtonLoading(btnR, true);
+        btnA.disabled = true;
+
+        await handleApprove(passId, 'REJECTED', true);
+
+        UI.setButtonLoading(btnR, false);
+        btnA.disabled = false;
+        hideApproveModal();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      };
+    }
+
+    function hideApproveModal() {
+      UI.hide(document.getElementById("approve-modal"));
+    }
+
+    // ── Init ──────────────────────────────────────────────────────
+    if (session) {
+      loadStats();
+      loadPending();
+      loadHistory();
+      checkUrlParams();
+    }
+  </script>
+</body>
+
+</html>

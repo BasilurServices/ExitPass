@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <title>New Exit Pass Request – Basilur</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif !important;
+            background-color: #f0f0f5 !important;
+            color: #1a1a2e !important;
+            -webkit-font-smoothing: antialiased;
+            padding: 24px 12px;
+            margin: 0;
+        }
+
+        .email-wrapper {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #dde0ef;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+        }
+
+        /* ── HEADER (keep dark for brand) ── */
+        .header {
+            background: linear-gradient(135deg, #1a0e30 0%, #0e1222 100%) !important;
+            padding: 28px 32px 24px;
+            text-align: center;
+        }
+
+        .header-logo-wrap {
+            display: block;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .logo-img {
+            max-height: 44px;
+            width: auto;
+            max-width: 160px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .logo-sep {
+            display: inline-block;
+            width: 1px;
+            height: 30px;
+            background: rgba(245, 166, 35, 0.4);
+            vertical-align: middle;
+            margin: 0 12px;
+        }
+
+        .logo-text-wrap {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: left;
+            line-height: 1.3;
+        }
+
+        .logo-name {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            color: #ffffff !important;
+            text-transform: uppercase;
+            display: block;
+        }
+
+        .logo-sub {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.24em;
+            color: #f5a623 !important;
+            text-transform: uppercase;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .new-badge {
+            display: inline-block;
+            background: rgba(245, 166, 35, 0.16);
+            color: #f5a623 !important;
+            border: 1px solid rgba(245, 166, 35, 0.45);
+            border-radius: 20px;
+            padding: 4px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffffff !important;
+            margin-bottom: 5px;
+            letter-spacing: 0.01em;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: #9999bb !important;
+        }
+
+        /* ── BODY ── */
+        .body {
+            padding: 28px 32px 24px;
+            background-color: #ffffff !important;
+        }
+
+        .alert-strip {
+            background-color: #fffbf0 !important;
+            border-left: 3px solid #f5a623;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+            margin-bottom: 22px;
+            font-size: 13px;
+            color: #7a5a00 !important;
+            line-height: 1.6;
+        }
+
+        .alert-strip strong {
+            color: #5a3f00 !important;
+        }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #888aaa !important;
+            margin-bottom: 10px;
+        }
+
+        /* ── DETAILS TABLE ── */
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e0e2ef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 22px;
+            font-size: 13px;
+        }
+
+        .details-table tr {
+            border-bottom: 1px solid #eceef8;
+        }
+
+        .details-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .details-table td.col-label {
+            width: 185px;
+            padding: 11px 16px;
+            background-color: #f7f8fc !important;
+            color: #6668a0 !important;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            border-right: 1px solid #eceef8;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+
+        .details-table td.col-value {
+            padding: 11px 16px;
+            color: #1a1a2e !important;
+            font-weight: 500;
+            vertical-align: middle;
+            background-color: #ffffff !important;
+        }
+
+        .col-value.highlight {
+            color: #b8720a !important;
+            font-weight: 700;
+            font-size: 15px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .col-value.mono {
+            font-family: 'Courier New', monospace;
+            color: #3a3a6a !important;
+        }
+
+        /* ── PILLS ── */
+        .pill {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .pill-pending {
+            background-color: #fff7e6 !important;
+            color: #b8720a !important;
+            border: 1px solid #f5c678;
+        }
+
+        .pill-yes {
+            background-color: #eafaf4 !important;
+            color: #1a7a52 !important;
+            border: 1px solid #74d4ab;
+        }
+
+        .pill-no {
+            background-color: #f5f5f8 !important;
+            color: #777799 !important;
+            border: 1px solid #ccccdd;
+        }
+
+        /* ── DIVIDER ── */
+        .divider {
+            border: none;
+            border-top: 1px solid #eceef8;
+            margin: 4px 0 22px;
+        }
+
+        /* ── ACTIONS ── */
+        .actions {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .actions p {
+            font-size: 12px;
+            color: #8888aa !important;
+            margin-bottom: 14px;
+        }
+
+        .btn-row {
+            display: inline-block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 13px 26px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            letter-spacing: 0.03em;
+            margin: 4px 6px;
+        }
+
+        .btn-approve {
+            background-color: #f5a623 !important;
+            color: #1a0a00 !important;
+        }
+
+        .btn-visit {
+            background-color: #f5f5fa !important;
+            color: #3a3a6a !important;
+            border: 1px solid #ccccdd;
+        }
+
+        /* ── FOOTER ── */
+        .footer {
+            background-color: #f7f8fc !important;
+            border-top: 1px solid #e0e2ef;
+            padding: 18px 32px;
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 11px;
+            color: #9999bb !important;
+            line-height: 1.8;
+        }
+
+        .footer a {
+            color: #7070bb !important;
+            text-decoration: none;
+        }
+
+        /* ── MOBILE RESPONSIVE ── */
+        @media only screen and (max-width: 480px) {
+            body {
+                padding: 12px 6px !important;
+            }
+
+            .email-wrapper {
+                border-radius: 12px !important;
+            }
+
+            .header {
+                padding: 22px 18px 18px !important;
+            }
+
+            /* Stack logo vertically on small screens */
+            .logo-sep {
+                display: none !important;
+            }
+
+            .logo-text-wrap {
+                display: block !important;
+                text-align: center !important;
+                margin-top: 8px;
+            }
+
+            .logo-img {
+                max-height: 36px !important;
+                max-width: 130px !important;
+            }
+
+            .header h1 {
+                font-size: 17px !important;
+            }
+
+            .body {
+                padding: 20px 16px 18px !important;
+            }
+
+            .details-table td.col-label {
+                width: 120px !important;
+                padding: 10px 10px !important;
+                font-size: 11px !important;
+                white-space: normal !important;
+            }
+
+            .details-table td.col-value {
+                padding: 10px 10px !important;
+                font-size: 12px !important;
+            }
+
+            .col-value.highlight {
+                font-size: 13px !important;
+            }
+
+            .btn {
+                display: block !important;
+                margin: 6px auto !important;
+                max-width: 260px !important;
+                width: 100%;
+            }
+
+            .footer {
+                padding: 14px 16px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-wrapper">
+
+        <!-- ═══ HEADER ═══ -->
+        <div class="header">
+            <div class="header-logo-wrap">
+                <img src="https://www.basilurtea.com/cdn/shop/files/Basilur.png?v=1614329016" alt="Basilur"
+                    class="logo-img" />
+                <span class="logo-sep"></span>
+                <span class="logo-text-wrap" style="color: #ffffff;">
+                    <span class="logo-name" style="color: #ffffff !important;">Basilur</span>
+                    <span class="logo-sub" style="color: #f5a623 !important;">Exit Pass</span>
+                </span>
+            </div>
+            <div class="new-badge">🔔 New Request</div>
+            <h1 style="color: #ffffff !important;">Exit Pass Request Submitted</h1>
+            <p style="color: #9999bb !important;">An employee has submitted a new exit pass that requires your review.
+            </p>
+        </div>
+
+        <!-- ═══ BODY ═══ -->
+        <div class="body">
+
+            <div class="alert-strip">
+                ⏳ This request is currently <strong>PENDING</strong> and awaiting your approval.
+                Please review the details below and take action at your earliest convenience.
+            </div>
+
+            <div class="section-label">Request Details</div>
+
+            <table class="details-table" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td class="col-label">Pass ID</td>
+                    <td class="col-value highlight">${pass.pass_id}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Employee Name</td>
+                    <td class="col-value">${pass.employee_name}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Employee ID</td>
+                    <td class="col-value mono">${pass.user_id}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Department</td>
+                    <td class="col-value">${pass.department}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Reason for Exit</td>
+                    <td class="col-value">${pass.reason}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Exit Time</td>
+                    <td class="col-value">${fmtDT(pass.exit_from)}</td>
+                </tr>
+                <tr>
+                    <td class="col-label">Expected Return</td>
+                    <td class="col-value">
+                        ${pass.return_required === "No"
+                        ? "<span class='pill pill-no'>No Return</span>"
+                        : fmtDT(pass.exit_to)}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-label">Return Required</td>
+                    <td class="col-value">
+                        ${pass.return_required === "No"
+                        ? "<span class='pill pill-no'>No</span>"
+                        : "<span class='pill pill-yes'>Yes</span>"}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-label">Approval Status</td>
+                    <td class="col-value"><span class="pill pill-pending">Pending</span></td>
+                </tr>
+                <tr>
+                    <td class="col-label">Submitted At</td>
+                    <td class="col-value mono" style="font-size:12px;">${fmtDT(pass.request_time)}</td>
+                </tr>
+            </table>
+
+            <hr class="divider">
+
+            <div class="actions">
+                <p>Take action directly from this email, or visit the dashboard to review in full.</p>
+                <div class="btn-row">
+                    <a href="${approveUrl}" class="btn btn-approve">✓ Review &amp; Approve</a>
+                    <a href="${systemUrl}" class="btn btn-visit">🖥 Visit Dashboard</a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ═══ FOOTER ═══ -->
+        <div class="footer">
+            <p>
+                Automated notification from the
+                <strong>Basilur Exit Pass Management System</strong>.<br>
+                You are receiving this as an Approver or HR personnel.<br>
+                <a href="${systemUrl}">Open Dashboard</a>
+            </p>
+        </div>
+
+    </div>
+</body>
+
+</html>

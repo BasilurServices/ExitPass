@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="logo.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Pass | Basilur Exit Pass</title>
+    <link rel="stylesheet" href="css/style.css?v=2.0">
+    <style>
+        .verify-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .verify-logo-text {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+        }
+
+        .verify-logo-text span {
+            color: var(--amber);
+        }
+
+        .qr-container {
+            text-align: center;
+            margin: 20px auto;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+
+        .qr-container img {
+            width: 200px;
+            height: 200px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .pass-id-large {
+            font-family: var(--font-mono);
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--amber);
+            letter-spacing: 0.1em;
+            text-align: center;
+            margin: 4px 0 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="verify-wrap">
+        <div style="width:100%;max-width:480px;">
+            <!-- Logo -->
+            <div class="verify-logo">
+                <div class="topbar__logo-container">
+                    <img src="logo.png" alt="Basilur Logo" class="topbar__logo-img">
+                </div>
+                <div>
+                    <div class="verify-logo-text">BASILUR <span>EXIT PASS</span></div>
+                </div>
+            </div>
+
+            <!-- Main Card -->
+            <div class="verify-card fade-in" id="verify-card">
+
+                <!-- Status Header -->
+                <div class="verify-header" id="status-header"
+                    style="background:var(--bg-panel); border-bottom:1px solid var(--border);">
+                    <div class="verify-status-banner">
+                        <div class="verify-status-text" style="margin-left:0; text-align:center; width:100%;">
+                            <h2 id="status-title" style="color:var(--text-primary);">Loading Pass…</h2>
+                            <p id="status-subtitle">Please wait</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="qr-section" class="qr-container hidden">
+                    <h3 style="margin-bottom: 12px; color: #1a1a2e; font-family: var(--font-display); font-size: 14px;">
+                        SCAN AT SECURITY</h3>
+                    <img id="qr-image" src="" alt="QR Code">
+                </div>
+
+                <!-- Pass Details -->
+                <div class="verify-body" id="verify-body">
+                    <div class="loading-overlay" id="body-loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <p
+                style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:16px;font-family:var(--font-mono);">
+                BASILUR SECURE VERIFICATION PORTAL
+            </p>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script>
+        function getPassIdFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get("id");
+        }
+
+        function renderDetails(pass) {
+            const body = document.getElementById("verify-body");
+            body.innerHTML = `
+      <div class="pass-id-large">${pass.pass_id}</div>
+      <div class="detail-row">
+        <span class="detail-row__label">Employee</span>
+        <span class="detail-row__value">${pass.employee_name || "—"}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__label">Department</span>
+        <span class="detail-row__value">${pass.department || "—"}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__label">Reason</span>
+        <span class="detail-row__value">${pass.reason}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__label">Exit From</span>
+        <span class="detail-row__value">${UI.formatDateTime(pass.exit_from)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__label">Return Required?</span>
+        <span class="detail-row__value">${pass.return_required || 'Yes'}</span>
+      </div>
+      ${pass.return_required !== 'No' ? `
+      <div class="detail-row">
+        <span class="detail-row__label">Return By</span>
+        <span class="detail-row__value">${UI.formatDateTime(pass.exit_to)}</span>
+      </div>` : ""}
+      <div class="detail-row">
+        <span class="detail-row__label">Approval Status</span>
+        <span class="detail-row__value">${UI.statusBadge(pass.approval_status)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-row__label">Movement Status</span>
+        <span class="detail-row__value">${UI.statusBadge(pass.movement_status)}</span>
+      </div>
+      ${pass.approved_by ? `
+      <div class="detail-row">
+        <span class="detail-row__label">Approved By</span>
+        <span class="detail-row__value">${pass.approved_by}</span>
+      </div>` : ""}
+    `;
+        }
+
+        async function loadMyPass() {
+            const passId = getPassIdFromURL();
+            if (!passId) {
+                document.getElementById("status-title").textContent = "Invalid Link";
+                document.getElementById("status-subtitle").textContent = "No pass ID found in URL";
+                document.getElementById("body-loading").innerHTML = `
+        <div class="alert alert--error">
+          <span class="alert__icon">⚠</span>
+          <span>Please use the link sent to you via SMS or email.</span>
+        </div>`;
+                return;
+            }
+
+            const res = await API.verifyPass(passId);
+
+            if (!res.success) {
+                document.getElementById("status-title").textContent = "Pass Not Found";
+                document.getElementById("status-subtitle").textContent = "Invalid or expired pass";
+                document.getElementById("body-loading").innerHTML = `
+        <div class="alert alert--error">
+          <span class="alert__icon">⚠</span>
+          <span>${res.error || "Pass not found in the system."}</span>
+        </div>`;
+                return;
+            }
+
+            const pass = res.pass;
+            renderDetails(pass);
+
+            const isToday = UI.isToday(pass.exit_from);
+            const ap = pass.approval_status;
+            const mv = pass.movement_status;
+
+            document.getElementById("status-title").textContent = "Pass Details";
+            document.getElementById("status-subtitle").textContent = "Status: " + ap;
+
+            let showQR = false;
+
+            if (ap === "APPROVED") {
+                if (mv === "NOT_EXITED" || (mv === "EXITED" && pass.return_required !== 'No')) {
+                    if (isToday) {
+                        showQR = true;
+                        const verifyUrl = window.location.origin + window.location.pathname.replace('my_pass.html', 'verify.html') + '?id=' + passId;
+                        const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://pipisara.github.io/BasilurExitPass/verify.html?id=${passId}`;
+                        document.getElementById("qr-image").src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalVerifyUrl)}`;
+                        document.getElementById("status-subtitle").textContent = "Ready for Guard Scan";
+                    } else {
+                        document.getElementById("status-subtitle").textContent = "Pass date has passed or not yet active";
+                    }
+                } else if (mv === "RETURNED" || (mv === "EXITED" && pass.return_required === 'No')) {
+                    document.getElementById("status-subtitle").textContent = "Pass Completed";
+                } else if (mv === "EXPIRED") {
+                    document.getElementById("status-subtitle").textContent = "Pass Expired";
+                }
+            } else if (ap === "REJECTED") {
+                document.getElementById("status-subtitle").textContent = "This pass was rejected.";
+            } else if (ap === "PENDING") {
+                if (isToday) {
+                    showQR = true;
+                    const verifyUrl = window.location.origin + window.location.pathname.replace('my_pass.html', 'verify.html') + '?id=' + passId;
+                    const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://pipisara.github.io/BasilurExitPass/verify.html?id=${passId}`;
+                    document.getElementById("qr-image").src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalVerifyUrl)}`;
+                    document.getElementById("status-subtitle").textContent = "Pending Approval - Show to Guard if needed";
+                } else {
+                    document.getElementById("status-subtitle").textContent = "Pending Approval...";
+                }
+            }
+
+            if (showQR) {
+                UI.show(document.getElementById("qr-section"));
+            } else {
+                UI.hide(document.getElementById("qr-section"));
+            }
+        }
+
+        loadMyPass();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/png" href="logo.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guard Dashboard | Basilur Exit Pass</title>
+    <link rel="stylesheet" href="css/style.css?v=2.0">
+    <style>
+        .guard-layout {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Nav & Layout Reductions */
+        .topbar {
+            height: 60px !important;
+            padding: 0 16px !important;
+        }
+
+        .topbar__logo-container {
+            height: 40px !important;
+            padding: 5px !important;
+        }
+
+        .topbar__logo-text {
+            font-size: 0.9rem !important;
+            white-space: nowrap;
+        }
+
+        .topbar__right {
+            gap: 12px !important;
+        }
+
+        .main {
+            padding: 12px 0 !important;
+        }
+
+        .container {
+            padding: 0 12px !important;
+        }
+
+        .card {
+            padding: 12px !important;
+            border-radius: var(--radius);
+        }
+
+        /* List overrides */
+        .recent-log {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: calc(100vh - 140px);
+            /* Adjust based on viewport */
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .log-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-panel);
+            border-radius: var(--radius);
+            border-left: 3px solid var(--border);
+            font-size: 13px;
+            transition: background 0.2s, transform 0.1s;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        .log-entry:hover {
+            background: var(--bg-card);
+            transform: translateY(-1px);
+        }
+
+        /* Distinct states */
+        .log-entry--upcoming {
+            border-left-color: var(--amber);
+        }
+
+        .log-entry--expected {
+            border-left-color: var(--blue);
+        }
+
+        .log-entry--completed {
+            border-left-color: var(--green);
+            opacity: 0.8;
+        }
+
+        .log-entry__content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .log-entry__id {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0px;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        .log-entry__status-badge {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 9px;
+            vertical-align: middle;
+        }
+
+        .log-entry__name {
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 0px;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .log-entry__meta {
+            color: var(--text-secondary);
+            font-size: 10px;
+        }
+
+        .log-entry__action {
+            margin-left: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            .topbar {
+                height: 50px !important;
+                padding: 0 10px !important;
+            }
+
+            .topbar__logo-text {
+                font-size: 0.8rem !important;
+            }
+
+            .topbar__logo-container {
+                height: 35px !important;
+            }
+
+            .topbar__user {
+                padding: 2px 6px !important;
+            }
+
+            .topbar__user #user-name {
+                display: none;
+            }
+
+            .main {
+                padding: 8px 0 !important;
+            }
+
+            .container {
+                padding: 0 8px !important;
+            }
+
+            .card {
+                padding: 10px !important;
+            }
+
+            .log-entry {
+                padding: 6px 10px;
+            }
+
+            .log-entry__action .btn {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+
+            .recent-log {
+                max-height: calc(100vh - 120px);
+            }
+        }
+
+        /* Prevent modal trigger when clicking buttons */
+        .btn-action-wrapper {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Status Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            width: 100%;
+            max-width: 400px;
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .modal-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .status-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .status-btn {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .status-btn:hover {
+            background: var(--bg-body);
+            border-color: var(--text-muted);
+        }
+
+        .status-btn.selected {
+            border-color: var(--primary);
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--primary);
+        }
+
+        .status-btn .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+
+        .status-btn.selected .indicator {
+            background: var(--primary);
+            box-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="topbar">
+        <a href="index.html" class="topbar__logo">
+            <div class="topbar__logo-container">
+                <img src="logo.png" alt="Basilur Logo" class="topbar__logo-img">
+            </div>
+            <span class="topbar__logo-text">BASILUR <span>EXIT PASS</span></span>
+        </a>
+        <div class="topbar__right">
+            <div class="topbar__user">
+                <span id="user-name">Loading…</span>
+                <span id="user-role" class="topbar__role-badge role--guard">GUARD</span>
+            </div>
+            <button class="btn btn--ghost btn--sm" id="logout-btn">Sign Out</button>
+        </div>
+    </nav>
+
+    <div class="main">
+        <div class="container guard-layout">
+
+            <!-- List Header -->
+            <div
+                style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; margin-top: 5px;">
+                <div style="display: flex; gap: 8px;">
+                    <a href="guard.html" class="btn btn--primary btn--sm">
+                        📷 QR Scanner
+                    </a>
+                    <button class="btn btn--ghost btn--sm" onclick="loadAllPasses()">
+                        <span style="font-size:16px;">↻</span> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Action Required Section -->
+            <div class="card">
+                <div id="loading-state" class="loading-overlay">
+                    <div class="spinner"></div> Loading passes…
+                </div>
+
+                <div id="empty-state" class="empty-state hidden">
+                    <div class="empty-state__icon">📝</div>
+                    <div class="empty-state__title">No active passes</div>
+                    <p>No upcoming exits or expected returns for today.</p>
+                </div>
+
+                <div class="recent-log hidden" id="passes-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Override Modal -->
+    <div class="modal-overlay" id="status-modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">Override Status</div>
+                <div class="modal-subtitle" id="modal-pass-id">EP-XXXXXX</div>
+            </div>
+
+            <div class="status-options" id="modal-options">
+                <button class="status-btn" onclick="selectStatus('NOT_EXITED')" data-value="NOT_EXITED">
+                    Not Exited (Waiting to leave)
+                    <span class="indicator"></span>
+                </button>
+                <button class="status-btn" onclick="selectStatus('EXITED')" data-value="EXITED">
+                    Exited (Currently out)
+                    <span class="indicator"></span>
+                </button>
+                <button class="status-btn" style="display:none;" id="opt-returned" onclick="selectStatus('RETURNED')"
+                    data-value="RETURNED">
+                    Returned (Back in premises)
+                    <span class="indicator"></span>
+                </button>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn--ghost" onclick="closeModal()">Cancel</button>
+                <button class="btn btn--primary" id="btn-save-status" onclick="saveStatusOverride()">Save
+                    Status</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/guard_list.js"></script>
+</body>
+
+</html>

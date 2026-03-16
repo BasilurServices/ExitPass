@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="logo.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guard Scanner | Basilur Exit Pass</title>
+  <link rel="stylesheet" href="css/style.css?v=2.0">
+  <!-- html5-qrcode for robust QR scanning -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    .guard-layout {
+      display: grid;
+      grid-template-columns: 480px 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .guard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .scan-section {
+      position: relative;
+    }
+
+    .scanner-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .scanner-status--active {
+      background: var(--green-glow);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .scanner-status--idle {
+      background: var(--amber-glow);
+      color: var(--amber);
+      border: 1px solid rgba(245, 166, 35, 0.2);
+    }
+
+    .scanner-status--error {
+      background: var(--red-glow);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .scan-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.2;
+      }
+    }
+
+    .manual-or {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .manual-or::before,
+    .manual-or::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .recent-log {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 600px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .log-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: var(--bg-panel);
+      border-radius: var(--radius);
+      border-left: 3px solid;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+
+    .log-entry:hover {
+      background: var(--bg-card);
+    }
+
+    .log-entry--exited {
+      border-color: var(--blue);
+    }
+
+    .log-entry--returned {
+      border-color: var(--green);
+    }
+
+    .log-entry__content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .log-entry__id {
+      font-family: var(--font-mono);
+      color: var(--amber);
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+
+    .log-entry__name {
+      color: var(--text-primary);
+      font-weight: 500;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-entry__meta {
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .log-entry__action {
+      margin-left: 12px;
+      flex-shrink: 0;
+    }
+
+    canvas {
+      display: none;
+    }
+
+    .camera-toggle {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    /* Scanner UI Refinements */
+    #reader {
+      width: 100% !important;
+      border: none !important;
+      background: #000;
+    }
+
+    #reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      border-radius: var(--radius);
+    }
+
+    /* Hide html5-qrcode's own UI elements if they appear */
+    #reader__dashboard,
+    #reader__status_span {
+      display: none !important;
+    }
+
+    /* Manual Entry Field Fixes */
+    .manual-entry-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .manual-entry-group .form-input {
+      flex: 1;
+      min-width: 0;
+      /* Prevents overflow in flex container */
+    }
+
+    @media (max-width: 768px) {
+      .manual-entry-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .manual-entry-group .btn {
+        width: 100% !important;
+        margin: 0 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="topbar">
+    <a href="index.html" class="topbar__logo">
+      <div class="topbar__logo-container">
+        <img src="logo.png" alt="Basilur Logo" class="topbar__logo-img">
+      </div>
+      <span class="topbar__logo-text">BASILUR <span>EXIT PASS</span></span>
+    </a>
+    <div class="topbar__right">
+      <div class="topbar__user">
+        <span id="user-name">Loading…</span>
+        <span id="user-role" class="topbar__role-badge role--guard">GUARD</span>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="logout-btn">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="container">
+      <!-- Page Header -->
+      <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+          <div class="page-header__eyebrow">Basilur Security Portal</div>
+          <h1 class="page-header__title" style="margin-bottom: 0;">QR Scanner</h1>
+          <p class="page-header__sub">Scan exit pass QR codes or enter manually</p>
+        </div>
+        <a href="guard_list.html" class="btn btn--secondary">
+          📋 Live List View
+        </a>
+      </div>
+
+      <div class="guard-layout">
+        <!-- LEFT: Scanner & Actions -->
+        <div class="scan-section">
+          <div class="card">
+            <div class="card__header">
+              <h2 class="card__title">Scanner / Manual</h2>
+              <div id="scanner-status" class="scanner-status scanner-status--idle" style="margin:0;padding:6px 10px;">
+                <span class="scan-dot"></span> IDLE
+              </div>
+            </div>
+
+            <!-- Camera controls -->
+            <div class="camera-toggle">
+              <button class="btn btn--primary btn--sm" id="start-btn" onclick="startCamera()">▶ Start Camera</button>
+              <button class="btn btn--ghost btn--sm hidden" id="stop-btn" onclick="stopCamera()">⏹ Stop</button>
+            </div>
+
+            <!-- Scanner container -->
+            <div class="scanner-video-wrap" id="reader-wrap" style="display:none;">
+              <div id="reader"></div>
+              <div class="scanner-crosshair"></div>
+            </div>
+
+            <div class="manual-or">OR ENTER MANUALLY</div>
+
+            <div class="manual-entry-group">
+              <input type="text" id="manual-pass-id" class="form-input" placeholder="EP-123456"
+                style="font-family:var(--font-mono);letter-spacing:0.05em;" />
+              <button class="btn btn--primary" onclick="verifyManual()">Verify</button>
+            </div>
+
+            <p style="font-size:11px;color:var(--text-muted);margin-top:10px;font-family:var(--font-mono);">
+              SCANNING REDIRECTS TO VERIFY PAGE FOR ACTION
+            </p>
+          </div>
+        </div>
+
+        <!-- RIGHT: Guard Dash -->
+        <div>
+          <!-- SECTION: Upcoming Exits -->
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card__header">
+              <h2 class="card__title">Upcoming Exits (Approved)</h2>
+              <button class="btn btn--ghost btn--sm" onclick="loadUpcoming()">↺ Refresh</button>
+            </div>
+
+            <div id="upcoming-loading" class="loading-overlay">
+              <div class="spinner"></div> Checking approved passes…
+            </div>
+
+            <div id="upcoming-empty" class="empty-state hidden">
+              <div class="empty-state__icon">📄</div>
+              <div class="empty-state__title">No upcoming exits</div>
+              <p>Approved passes pending exit will show here.</p>
+            </div>
+
+            <div class="recent-log hidden" id="upcoming-list"></div>
+          </div>
+
+          <!-- SECTION: Recent Log -->
+          <div class="card">
+            <div class="card__header">
+              <h2 class="card__title">Recent Movements</h2>
+              <button class="btn btn--ghost btn--sm" onclick="loadLog()">↺ Refresh</button>
+            </div>
+
+            <div id="log-loading" class="loading-overlay">
+              <div class="spinner"></div> Loading log…
+            </div>
+
+            <div id="log-empty" class="empty-state hidden">
+              <div class="empty-state__icon">📋</div>
+              <div class="empty-state__title">No movements yet</div>
+              <p>Movement records will appear here.</p>
+            </div>
+
+            <div class="recent-log hidden" id="log-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    const session = Auth.requireAuth(["guard", "admin"]);
+    if (session) {
+      UI.renderTopbarUser(session);
+      UI.bindLogout();
+    }
+
+    // ── Camera QR Scanning with html5-qrcode ──────────────────────
+    let html5QrCode = null;
+    let lastScanned = null;
+    let lastScannedTime = 0;
+
+    async function startCamera() {
+      console.log("Initializing scanner...");
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          throw new Error("Scanner library not loaded. Please refresh or check your connection.");
+        }
+
+        const readerWrap = document.getElementById("reader-wrap");
+
+        // Clear any previous instance
+        if (html5QrCode) {
+          try { await html5QrCode.stop(); } catch (e) { }
+        }
+
+        readerWrap.style.display = "block";
+        html5QrCode = new Html5Qrcode("reader");
+
+        // UI Feedback
+        UI.show(document.getElementById("stop-btn"));
+        UI.hide(document.getElementById("start-btn"));
+        setStatus("active", "SCANNING...");
+
+        const config = {
+          fps: 25, // Higher FPS for faster detection
+          qrbox: (vw, vh) => {
+            const size = Math.min(vw, vh) * 0.75;
+            return { width: size, height: size };
+          },
+          formatsToSupport: [0], // 0 is Html5QrcodeSupportedFormats.QR_CODE
+          aspectRatio: 1.333334,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        };
+
+        // Prefer back camera
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            const now = Date.now();
+            // Debounce: ignore same code for 3s
+            if (decodedText === lastScanned && (now - lastScannedTime) < 3000) return;
+
+            console.log("✅ QR Detected:", decodedText);
+            lastScanned = decodedText;
+            lastScannedTime = now;
+
+            // Visual feedback
+            setStatus("active", "DETECTED!");
+            handleScanResult(decodedText);
+          },
+          (errorMessage) => {
+            // Silence common scanning errors to avoid console noise
+          }
+        );
+
+      } catch (err) {
+        console.error("Scanner Error:", err);
+        UI.toast(err.message || "Could not access camera.", "error");
+        setStatus("error", "CAMERA ERROR");
+        stopCamera();
+      }
+    }
+
+    async function stopCamera() {
+      console.log("Stopping scanner...");
+      if (html5QrCode) {
+        try {
+          if (html5QrCode.isScanning) {
+            await html5QrCode.stop();
+          }
+          await html5QrCode.clear();
+        } catch (err) {
+          console.warn("Scanner stop error:", err);
+        }
+        html5QrCode = null;
+      }
+
+      document.getElementById("reader-wrap").style.display = "none";
+      UI.hide(document.getElementById("stop-btn"));
+      UI.show(document.getElementById("start-btn"));
+      setStatus("idle", "IDLE");
+    }
+
+    function handleScanResult(data) {
+      if (!data) return;
+
+      UI.toast("Processing QR...", "success");
+
+      let passId = null;
+      const prefix = (APP_CONFIG.PASS_PREFIX || "EP").toUpperCase();
+
+      try {
+        // 1. Check if it's a URL (from our app or similar)
+        const url = new URL(data);
+        passId = url.searchParams.get("id");
+      } catch (e) {
+        // 2. Not a URL, try regex for ID pattern (e.g., EP-123456 or EP123456)
+        const regex = new RegExp(`${prefix}-?\\d+`, "i");
+        const match = data.match(regex);
+        if (match) {
+          passId = match[0].toUpperCase();
+          // Ensure it has the hyphen if it's missing (e.g., EP123456 -> EP-123456)
+          if (!passId.includes("-")) {
+            passId = passId.replace(prefix, prefix + "-");
+          }
+        }
+      }
+
+      if (passId) {
+        console.log("🎯 Valid ID Extracted:", passId);
+        stopCamera();
+        // Brief delay for visual feedback
+        setTimeout(() => {
+          window.location.href = `verify.html?id=${encodeURIComponent(passId)}`;
+        }, 600);
+      } else {
+        UI.toast("Invalid QR. Expected ID starting with " + prefix, "warning");
+        console.warn("Could not parse ID from:", data);
+      }
+    }
+
+    // ── Manual Verify ─────────────────────────────────────────────
+    function verifyManual() {
+      const id = document.getElementById("manual-pass-id").value.trim().toUpperCase();
+      if (!id) { UI.toast("Enter a pass ID.", "warning"); return; }
+      window.location.href = `verify.html?id=${encodeURIComponent(id)}`;
+    }
+
+    document.getElementById("manual-pass-id").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") verifyManual();
+    });
+
+    // ── Status indicator ──────────────────────────────────────────
+    function setStatus(type, text) {
+      const el = document.getElementById("scanner-status");
+      el.className = `scanner-status scanner-status--${type}`;
+      el.innerHTML = `<span class="scan-dot"></span> ${text}`;
+    }
+
+    // ── Load Recent Log ───────────────────────────────────────────
+    async function loadLog() {
+      const loading = document.getElementById("log-loading");
+      const empty = document.getElementById("log-empty");
+      const list = document.getElementById("log-list");
+
+      try {
+        UI.show(loading);
+        UI.hide(empty);
+        UI.hide(list);
+
+        const res = await API.getGuardLog(40);
+        console.log("Guard log response:", res);
+
+        let entries = res.entries || [];
+        // Filter: only show today's movements
+        entries = entries.filter(e => UI.isToday(e.exit_time) || UI.isToday(e.return_time) || UI.isToday(e.request_time));
+
+        if (!res.success || entries.length === 0) {
+          UI.show(empty);
+          return;
+        }
+
+        list.innerHTML = entries.map(e => `
+          <div class="log-entry log-entry--${e.movement_status?.toLowerCase() || 'exited'}">
+            <div class="log-entry__content">
+              <div class="log-entry__id">${e.pass_id}</div>
+              <div class="log-entry__name">${e.employee_name || "—"}</div>
+              <div class="log-entry__meta">
+                <span class="badge badge--${e.movement_status?.toLowerCase()}" style="font-size:9px; padding: 1px 6px; margin-right: 4px;">
+                  ${e.movement_status}
+                </span>
+                ${UI.formatDateTime(e.exit_time || e.return_time)}
+                ${e.guard_name ? ` · <span style="opacity:0.7">${e.guard_name}</span>` : ""}
+              </div>
+            </div>
+            ${(e.movement_status === "EXITED" && e.return_required !== "No") ? `
+              <div class="log-entry__action">
+                <button class="btn btn--primary btn--sm" style="padding: 4px 10px; font-size: 10px;" onclick="markMovement('${e.pass_id}', 'RETURNED', this)">
+                  ↩ Return
+                </button>
+              </div>
+            ` : ""}
+          </div>
+        `).join("");
+        UI.show(list);
+      } catch (err) {
+        console.error("loadLog error:", err);
+        UI.show(empty);
+      } finally {
+        UI.hide(loading);
+      }
+    }
+
+    // ── Load Upcoming Exits ───────────────────────────────────────
+    async function loadUpcoming() {
+      const loading = document.getElementById("upcoming-loading");
+      const empty = document.getElementById("upcoming-empty");
+      const list = document.getElementById("upcoming-list");
+
+      try {
+        UI.show(loading);
+        UI.hide(empty);
+        UI.hide(list);
+
+        const res = await API.getApprovedPasses();
+        console.log("Upcoming passes response:", res);
+
+        let passes = res.passes || [];
+        // Filter: only show today's exits
+        passes = passes.filter(p => UI.isToday(p.exit_from));
+
+        if (!res.success || passes.length === 0) {
+          UI.show(empty);
+          return;
+        }
+
+        list.innerHTML = passes.map(p => `
+          <div class="log-entry log-entry--not_exited">
+            <div class="log-entry__content">
+              <div class="log-entry__id">${p.pass_id}</div>
+              <div class="log-entry__name">${p.employee_name || "—"}</div>
+              <div class="log-entry__meta">
+                Approved · Requested for ${UI.formatDateTime(p.exit_from)}
+              </div>
+            </div>
+            <div class="log-entry__action">
+              <button class="btn btn--success btn--sm" style="padding: 4px 10px; font-size: 10px;" onclick="markMovement('${p.pass_id}', 'EXITED', this)">
+                ✓ Exit
+              </button>
+            </div>
+          </div>
+        `).join("");
+        UI.show(list);
+      } catch (err) {
+        console.error("loadUpcoming error:", err);
+        UI.show(empty);
+      } finally {
+        UI.hide(loading);
+      }
+    }
+
+    // ── Mark Movement Action ─────────────────────────────────────
+    async function markMovement(passId, movement, btn) {
+      const guardName = (session ? session.name : "") || "System";
+      const actionLabel = movement === "EXITED" ? "Exit" : "Return";
+
+      const confirmed = await UI.confirm(`Confirm ${actionLabel}`, `Mark pass <strong>${passId}</strong> as ${movement}?`);
+      if (!confirmed) return;
+
+      UI.setButtonLoading(btn, true, actionLabel);
+
+      try {
+        const res = await API.updateMovementStatus({
+          pass_id: passId,
+          movement: movement,
+          guard_name: guardName
+        });
+
+        if (res.success) {
+          UI.toast(`Pass ${passId} marked as ${movement.toLowerCase()}.`, "success");
+          loadLog();
+          loadUpcoming();
+        } else {
+          UI.toast(res.error || "Failed to update status.", "error");
+        }
+      } catch (err) {
+        console.error("markMovement error:", err);
+        UI.toast("An error occurred. Please try again.", "error");
+      } finally {
+        UI.setButtonLoading(btn, false, actionLabel);
+      }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────
+    if (session) {
+      loadLog();
+      loadUpcoming();
+    }
+  </script>
+</body>
+
+</html>
