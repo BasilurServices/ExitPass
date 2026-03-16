@@ -202,7 +202,7 @@
                     if (isToday) {
                         showQR = true;
                         const verifyUrl = window.location.origin + window.location.pathname.replace('my_pass.html', 'verify.html') + '?id=' + passId;
-                        const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://pipisara.github.io/BasilurExitPass/verify.html?id=${passId}`;
+                        const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://basilurservices.github.io/ExitPass/verify.html?id=${passId}`;
                         document.getElementById("qr-image").src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalVerifyUrl)}`;
                         document.getElementById("status-subtitle").textContent = "Ready for Guard Scan";
                     } else {
@@ -219,7 +219,7 @@
                 if (isToday) {
                     showQR = true;
                     const verifyUrl = window.location.origin + window.location.pathname.replace('my_pass.html', 'verify.html') + '?id=' + passId;
-                    const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://pipisara.github.io/BasilurExitPass/verify.html?id=${passId}`;
+                    const finalVerifyUrl = verifyUrl.includes('verify.html') ? verifyUrl : `https://basilurservices.github.io/ExitPass/verify.html?id=${passId}`;
                     document.getElementById("qr-image").src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(finalVerifyUrl)}`;
                     document.getElementById("status-subtitle").textContent = "Pending Approval - Show to Guard if needed";
                 } else {

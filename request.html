@@ -135,13 +135,17 @@
 
               <div class="form-grid-2">
                 <div class="form-group">
-                  <label class="form-label" for="exit-from">Exit Time</label>
+                  <label class="form-label" for="exit-from">Expected Exit Time</label>
                   <input type="time" id="exit-from" class="form-input" required />
                 </div>
-                <div class="form-group" id="return-to-group">
+                <div class="form-group hidden" id="return-to-group">
                   <label class="form-label" for="exit-to">Expected Return Time</label>
-                  <input type="time" id="exit-to" class="form-input" required />
+                  <input type="time" id="exit-to" class="form-input" />
                 </div>
+              </div>
+
+              <div class="alert-strip" style="background-color: rgba(245, 166, 35, 0.1); border-left: 3px solid var(--amber); padding: 10px; margin-bottom: 16px; border-radius: 4px; font-size: 12px;">
+                <p><strong>Note:</strong> Your actual exit and return times will be automatically recorded by the security guard.</p>
               </div>
 
               <div class="form-group">
@@ -311,6 +315,8 @@
 
     // ── Show/hide Return Time field based on Return Required ──────
     document.getElementById("return-required").addEventListener("change", function () {
+      // Logic removed: Return time is now hidden by default as per request
+      /*
       const returnGroup = document.getElementById("return-to-group");
       const returnInput = document.getElementById("exit-to");
       if (this.value === "No") {
@@ -321,6 +327,7 @@
         UI.show(returnGroup);
         returnInput.required = true;
       }
+      */
     });
 
     // ── Submit Request ────────────────────────────────────────────
@@ -435,8 +442,9 @@
             </div>
           </div>
           <div class="pass-card__meta">
-            <span>🕐 ${UI.formatDateTime(pass.exit_from)}</span>
-            ${pass.return_required === "Yes" ? `<span>🕓 Return By: ${UI.formatDateTime(pass.exit_to)}</span>` : "<span>🚫 No Return</span>"}
+            <span>🕐 Exp. Exit: ${UI.formatDateTime(pass.exit_from)}</span>
+            ${pass.exit_time ? `<span>🚪 Actual Exit: ${UI.formatDateTime(pass.exit_time)}</span>` : ""}
+            ${pass.return_time ? `<span>🏠 Actual Return: ${UI.formatDateTime(pass.return_time)}</span>` : ""}
             ${pass.approved_by ? `<span>✅ ${pass.approved_by}</span>` : ""}
           </div>
           <div class="pass-card__actions">

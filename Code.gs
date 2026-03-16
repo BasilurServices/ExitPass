@@ -1,4 +1,4 @@
-﻿// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // ExitPass — Google Apps Script Backend (Code.gs)
 // Deploy as: Execute as Me · Access: Anyone
 // ═══════════════════════════════════════════════════════════════════
@@ -427,14 +427,14 @@ function deleteUser(body) {
 // ── 2. CREATE EXIT PASS ───────────────────────────────────────────
 function createExitPass(body) {
   const { user_id, reason, exit_from, exit_to, return_required } = body;
-  if (!user_id || !reason || !exit_from || (return_required !== "No" && !exit_to)) {
+  if (!user_id || !reason || !exit_from) {
     return { success: false, error: "Missing required fields." };
   }
 
   const exitFromDate = parseDate(exit_from);
-  const exitToDate   = return_required !== "No" ? parseDate(exit_to) : null;
+  const exitToDate   = (return_required !== "No" && exit_to) ? parseDate(exit_to) : null;
 
-  if (!exitFromDate || (return_required !== "No" && !exitToDate)) {
+  if (!exitFromDate) {
     return { success: false, error: "Invalid date format." };
   }
   if (exitToDate && exitToDate <= exitFromDate) {
@@ -530,7 +530,7 @@ function createExitPass(body) {
     if (approverPhones.length === 0) {
       queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found in 'USERS' sheet with both an HR/Admin role AND a valid phone number. Check columns.`);
     } else {
-      const approveLink = `https://pipisara.github.io/BasilurExitPass/approve.html?id=${pass_id}`;
+      const approveLink = `https://basilurservices.github.io/ExitPass/approve.html?id=${pass_id}`;
       const smsMessage = `Exit Pass\nName: ${employeeName} (${user_id})\n${formatSmsTime(exit_from)}\nPass #${pass_id}.\n\n${approveLink}`;
       approverPhones.forEach(phone => queueSMS(phone, smsMessage));
     }
@@ -661,7 +661,7 @@ function approvePass(body) {
         const userMap = buildUserMap();
         const employee = userMap[userKey];
         if (employee && employee.phone && status === "APPROVED") {
-           const qrLink = `https://pipisara.github.io/BasilurExitPass/my_pass.html?id=${pass_id}`;
+           const qrLink = `https://basilurservices.github.io/ExitPass/my_pass.html?id=${pass_id}`;
            const msg = `Exit Pass APPROVED\nPass #${pass_id}\nApprover: ${approver_name || 'System'}\n\nLink: ${qrLink}`;
            queueSMS(employee.phone, msg);
         }
@@ -1015,8 +1015,8 @@ function sendExitPassNotification(pass) {
     });
   }
 
-  const approveUrl = `https://pipisara.github.io/BasilurExitPass/approve.html?id=${pass.pass_id}`;
-  const systemUrl  = "https://pipisara.github.io/BasilurExitPass/approve.html";
+  const approveUrl = `https://basilurservices.github.io/ExitPass/approve.html?id=${pass.pass_id}`;
+  const systemUrl  = "https://basilurservices.github.io/ExitPass/approve.html";
 
   // ── HTML Email Template (light theme, mobile-responsive) ─────────
   const htmlBody = `

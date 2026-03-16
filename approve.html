@@ -230,7 +230,9 @@
                   <th>Reason</th>
                   <th>Exit From</th>
                   <th>Return By</th>
-                  <th>Return Required</th>
+                  <th>Actual Exit</th>
+                  <th>Actual Return</th>
+                  <th>Duration</th>
                   <th>Approval</th>
                   <th>Movement</th>
                   <th>Approved By</th>
@@ -597,20 +599,37 @@
         return;
       }
 
-      tbody.innerHTML = passes.map(p => `
-      <tr>
-        <td><span class="td-mono">${p.pass_id}</span></td>
-        <td><span class="td-primary">${p.employee_name || "—"}</span></td>
-        <td class="text-secondary">${p.department || "—"}</td>
-        <td>${p.reason}</td>
-        <td class="text-secondary">${UI.formatDateTime(p.exit_from)}</td>
-        <td class="text-secondary">${p.return_required === 'No' ? '—' : UI.formatDateTime(p.exit_to)}</td>
-        <td class="text-secondary">${p.return_required === 'No' ? 'No' : 'Yes'}</td>
-        <td>${UI.statusBadge(p.approval_status)}</td>
-        <td>${UI.statusBadge(p.movement_status)}</td>
-        <td class="text-secondary">${p.approved_by || "—"}</td>
-      </tr>
-    `).join("");
+      tbody.innerHTML = passes.map(p => {
+        let rowClass = "";
+        let durationText = "—";
+        
+        if (p.movement_status === "EXITED" && p.exit_time) {
+          const exitTime = new Date(p.exit_time);
+          const now = new Date();
+          const diffMins = Math.floor((now - exitTime) / 60000);
+          if (diffMins > 90) rowClass = 'style="background-color: rgba(239, 68, 68, 0.1);"';
+          
+          const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          durationText = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+        }
+
+        return `
+        <tr ${rowClass}>
+          <td><span class="td-mono">${p.pass_id}</span></td>
+          <td><span class="td-primary">${p.employee_name || "—"}</span></td>
+          <td class="text-secondary">${p.department || "—"}</td>
+          <td>${p.reason}</td>
+          <td class="text-secondary">${UI.formatDateTime(p.exit_from)}</td>
+          <td class="text-secondary">${p.return_required === 'No' ? '—' : UI.formatDateTime(p.exit_to)}</td>
+          <td class="text-secondary">${UI.formatDateTime(p.exit_time)}</td>
+          <td class="text-secondary">${UI.formatDateTime(p.return_time)}</td>
+          <td>${durationText}</td>
+          <td>${UI.statusBadge(p.approval_status)}</td>
+          <td>${UI.statusBadge(p.movement_status)}</td>
+          <td class="text-secondary">${p.approved_by || "—"}</td>
+        </tr>
+      `;}).join("");
       UI.hide(empty);
       UI.show(wrap);
     }

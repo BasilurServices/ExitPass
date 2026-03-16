@@ -1,38 +1,26 @@
-// ─────────────────────────────────────────────────────────────────
-// config.js — Exit Pass System Configuration
-// ─────────────────────────────────────────────────────────────────
-// ⚠️  IMPORTANT: Replace the values below with your actual values
-//     before deploying to GitHub Pages.
-// ─────────────────────────────────────────────────────────────────
+/**
+ * CONFIGURATION
+ * Replace the URL below with your deployed Google Apps Script Web App URL.
+ */
+const CONFIG = {
+    // 1. Paste your Google Apps Script URL here:
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyR0dypdEptE7eFSm5PBEmocVSnJuUvequ4b7GEUhS1kT_M8HWIY_4Sxgd7EXLFb0o_/exec',
 
-const APP_CONFIG = {
-  // Replace with your deployed Google Apps Script Web App URL
-  API_URL: "https://script.google.com/macros/s/AKfycbwfzw8iuITDP0syC2GGK3lFtdNpRELWZJGDy8HdUTYWbdz3ANn7jfk8ByoCaMJo7Ijj/exec",
+    // 2. Admin password (for demonstration purposes)
+    ADMIN_PASSWORD: 'admin123',
 
-  // Replace with your GitHub username
-  GITHUB_USER: "Pipisara",
+    // 3. Company details
+    COMPANY_NAME: 'Basilur Tea Export',
 
-  // Repository name (keep as-is if you use the same repo name)
-  REPO_NAME: "BasilurExitPass",
-
-  // App metadata
-  APP_NAME: "ExitPass",
-  APP_TAGLINE: "Secure Exit Management System",
-  ORG_NAME: "Basilur",
-
-  // Pass ID prefix (aesthetic choice)
-  PASS_PREFIX: "EP",
-
-  // Auto-logout after X minutes of inactivity (0 = disabled)
-  SESSION_TIMEOUT_MINS: 60,
+    // 4. Department list
+    DEPARTMENTS: [
+        'Operation', 'Management', 'BTE', 'Engineering', 'Finance', 'FTD', 'Graphic',
+        'Human Resources', 'Import & Export', 'Marketing', 'Production', 'Purchasing',
+        'Quality Assurance', 'Sales', 'Stores', 'Tea', 'Technology'
+    ]
 };
 
-// Derived values (auto-computed — do not edit)
-APP_CONFIG.BASE_URL = `https://${APP_CONFIG.GITHUB_USER}.github.io/${APP_CONFIG.REPO_NAME}`;
-APP_CONFIG.VERIFY_URL = `${APP_CONFIG.BASE_URL}/verify.html`;
 
-// Freeze to prevent accidental mutation
-Object.freeze(APP_CONFIG);
 
-// Make globally accessible
-window.APP_CONFIG = APP_CONFIG;
+
+

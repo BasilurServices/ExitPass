@@ -1517,6 +1517,7 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
 /* -- USER PROFILE INTERACTION -- */
 .topbar__user {
   padding: 4px 10px;

@@ -92,6 +92,23 @@
             opacity: 0.8;
         }
 
+        .log-entry--on-time {
+            background: rgba(34, 197, 94, 0.1) !important;
+            border-left-color: #22c55e !important;
+        }
+
+        .log-entry--late {
+            background: rgba(239, 68, 68, 0.1) !important;
+            border-left-color: #ef4444 !important;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
         .log-entry__content {
             flex: 1;
             min-width: 0;
@@ -306,6 +323,10 @@
             </div>
             <span class="topbar__logo-text">BASILUR <span>EXIT PASS</span></span>
         </a>
+        <div id="nav-clock" style="margin-left:auto; margin-right:20px; font-family:var(--font-mono); color:var(--amber); font-size:14px; text-align:right; line-height:1.2;">
+            <div id="clock-time" style="font-weight:700; font-size:16px;">--:--:--</div>
+            <div id="clock-date" style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">-- --- ----</div>
+        </div>
         <div class="topbar__right">
             <div class="topbar__user">
                 <span id="user-name">Loading…</span>
