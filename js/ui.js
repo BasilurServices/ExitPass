@@ -318,7 +318,29 @@ const UI = (() => {
     generateQR,
     timeRemaining,
     showProfileModal,
+    downloadCSV,
   };
 })();
+
+function downloadCSV(filename, data) {
+  if (!data || !data.length) return;
+  const csvContent = data.map(row => 
+    row.map(cell => {
+      let s = String(cell === null || cell === undefined ? "" : cell).replace(/"/g, '""');
+      if (s.search(/("|,|\n)/g) >= 0) s = `"${s}"`;
+      return s;
+    }).join(",")
+  ).join("\n");
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 window.UI = UI;

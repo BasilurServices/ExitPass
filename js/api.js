@@ -125,6 +125,11 @@ const API = (() => {
     return call({ action: "getStats" });
   }
 
+  // ── 10.1 Get Detailed Stats ────────────────────────────────────
+  async function getDetailedStats(days = 30, department = "") {
+    return call({ action: "getDetailedStats", days, department });
+  }
+
   // ── 11. Get User Profile ────────────────────────────────────────
   async function getUserProfile(user_id) {
     return call({ action: "getUserProfile", user_id });
@@ -152,6 +157,7 @@ const API = (() => {
     getGuardLog,
     getExpectedReturns,
     getStats,
+    getDetailedStats,
     getAllUsers,
     editUser,
     deleteUser,

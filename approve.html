@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Approver Dashboard | Basilur Exit Pass</title>
   <link rel="stylesheet" href="css/style.css?v=2.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     .tabs {
       display: flex;
@@ -89,6 +90,69 @@
 
     .filter-bar select option {
       background: var(--bg-panel);
+    }
+
+    /* Stats Specific Styles */
+    .stats-layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 500px) {
+      .stats-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-container {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      min-height: 350px;
+    }
+
+    .chart-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-align: center;
+    }
+
+    .metric-box__value {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--amber);
+      margin-bottom: 4px;
+    }
+
+    .metric-box__label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
   </style>
 </head>
@@ -189,6 +253,7 @@
         <button class="tab-btn active" data-tab="history">All Passes</button>
         <!-- Only show Users tab for hr/admin/approver -->
         <button class="tab-btn" data-tab="users">Users</button>
+        <button class="tab-btn" data-tab="stats">Statistics</button>
       </div>
 
       <!-- HISTORY TAB -->
@@ -298,6 +363,84 @@
               </thead>
               <tbody id="users-tbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATISTICS TAB -->
+      <div class="tab-panel" id="tab-stats">
+        <div class="card">
+          <div class="card__header">
+            <h2 class="card__title">Detailed Trends & Analytics</h2>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn--primary btn--sm" id="export-csv-btn">📊 Export Full List (CSV)</button>
+              <button class="btn btn--ghost btn--sm" onclick="loadDetailedStats()">↺ Refresh</button>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <select id="stats-days-filter">
+              <option value="7">Last 7 Days</option>
+              <option value="30" selected>Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last Year</option>
+            </select>
+            <span class="text-secondary" style="font-size: 12px;">Data updates in real-time based on approval activity.</span>
+          </div>
+
+          <div id="stats-loading" class="loading-overlay hidden">
+            <div class="spinner"></div> Calculating analytics…
+          </div>
+
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-box__value" id="det-total-exits">0</div>
+              <div class="metric-box__label">Total Exit Passes</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-box__value" id="det-avg-duration">0m</div>
+              <div class="metric-box__label">Avg. Duration</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-box__value" id="det-overdue">0</div>
+              <div class="metric-box__label">Overdue Right Now</div>
+            </div>
+          </div>
+
+          <div class="stats-layout">
+            <div class="chart-container">
+              <div class="chart-title">Weekly Trend (Exits/Day)</div>
+              <canvas id="trendChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <div class="chart-title">Exits by Reason</div>
+              <canvas id="reasonChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <div class="chart-title">Exits by Department</div>
+              <canvas id="deptChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <div class="chart-title">Hourly Distribution (24h)</div>
+              <canvas id="hourChart"></canvas>
+            </div>
+          </div>
+
+          <div style="margin-top: 32px;">
+            <h3 class="card__title" style="margin-bottom: 16px;">Top Frequent Exiters</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>Exit Count</th>
+                    <th>Total Time Away</th>
+                  </tr>
+                </thead>
+                <tbody id="top-users-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -416,6 +559,7 @@
         document.getElementById("tab-" + this.dataset.tab).classList.add("active");
         if (this.dataset.tab === "history" && !historyLoaded) loadHistory();
         if (this.dataset.tab === "users" && !usersLoaded) loadUsers();
+        if (this.dataset.tab === "stats") loadDetailedStats();
       });
     });
     let historyLoaded = false;
@@ -436,6 +580,192 @@
         document.getElementById("stat-out").textContent = outToday;
       }
     }
+
+    // ── Detailed Stats ────────────────────────────────────────────
+    let charts = {};
+
+    async function loadDetailedStats() {
+      const days = document.getElementById("stats-days-filter").value;
+      const loading = document.getElementById("stats-loading");
+      UI.show(loading);
+
+      const res = await API.getDetailedStats(days);
+      UI.hide(loading);
+
+      if (!res.success) {
+        UI.toast("Failed to load detailed statistics", "error");
+        return;
+      }
+
+      // Update Metrics
+      document.getElementById("det-total-exits").textContent = res.summary.totalExits;
+      document.getElementById("det-avg-duration").textContent = `${res.summary.avgDuration}m`;
+      document.getElementById("det-overdue").textContent = res.summary.overdueCount;
+
+      // Render Charts
+      renderTrendChart(res.dailyTrends);
+      renderPieChart("reasonChart", res.reasonStats, "Exits by Reason");
+      renderBarChart("deptChart", res.deptStats, "Exits by Department", "#3b82f6");
+      renderHourChart(res.hourlyDist);
+
+      // Render Top Users
+      const topTbody = document.getElementById("top-users-tbody");
+      topTbody.innerHTML = res.topUsers.map(u => `
+        <tr>
+          <td><span class="td-primary">${u.name}</span> <span class="text-secondary" style="font-size:11px;">(${u.uid})</span></td>
+          <td class="text-secondary">${u.dept}</td>
+          <td><span class="badge badge--pending">${u.count} exits</span></td>
+          <td class="text-secondary">${Math.round(u.duration / 60)}h ${Math.round(u.duration % 60)}m</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderTrendChart(trendData) {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      const labels = Object.keys(trendData).sort();
+      const values = labels.map(l => trendData[l]);
+
+      if (charts.trend) charts.trend.destroy();
+      charts.trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.map(l => l.split('-').slice(1).join('/')),
+          datasets: [{
+            label: 'Exits',
+            data: values,
+            borderColor: '#f5a623',
+            backgroundColor: 'rgba(245, 166, 35, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#f5a623'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderPieChart(id, data, label) {
+      const ctx = document.getElementById(id).getContext('2d');
+      const labels = Object.keys(data);
+      const values = Object.values(data);
+
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: ['#f5a623', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { color: '#888', font: { size: 11 } } }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    function renderBarChart(id, data, label, color) {
+      const ctx = document.getElementById(id).getContext('2d');
+      const labels = Object.keys(data);
+      const values = Object.values(data);
+
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: values,
+            backgroundColor: color,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function renderHourChart(dist) {
+      const ctx = document.getElementById('hourChart').getContext('2d');
+      if (charts.hour) charts.hour.destroy();
+      charts.hour = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Array.from({length: 24}, (_, i) => `${i}h`),
+          datasets: [{
+            data: dist,
+            backgroundColor: '#10b981',
+            borderRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    document.getElementById("stats-days-filter").addEventListener("change", loadDetailedStats);
+
+    // ── Export CSV ────────────────────────────────────────────────
+    document.getElementById("export-csv-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("export-csv-btn");
+      UI.setButtonLoading(btn, true, "Fetching Data...");
+      
+      const res = await API.getAllPasses(2000, 0); // Fetch a large batch for export
+      UI.setButtonLoading(btn, false, "📊 Export Full List (CSV)");
+
+      if (res.success && res.passes) {
+        const headers = ["Pass ID", "User ID", "Name", "Department", "Reason", "Status", "Request Time", "Exit Time", "Return Time", "Guard"];
+        const rows = res.passes.map(p => [
+          p.pass_id,
+          p.user_id,
+          p.employee_name,
+          p.department,
+          p.reason,
+          p.approval_status,
+          p.request_time,
+          p.exit_time,
+          p.return_time,
+          p.guard_name
+        ]);
+        
+        UI.downloadCSV(`ExitPass_Export_${new Date().toISOString().split('T')[0]}.csv`, [headers, ...rows]);
+        UI.toast("Export started!", "success");
+      } else {
+        UI.toast("Failed to fetch data for export", "error");
+      }
+    });
 
     // ── Load Pending ──────────────────────────────────────────────
     async function loadPending() {

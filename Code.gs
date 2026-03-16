@@ -96,6 +96,7 @@ function doPost(e) {
       case "revertMovementStatus":result = revertMovementStatus(body);break;
       case "getGuardLog":         result = getGuardLog(body);         break;
       case "getStats":            result = getStats(body);            break;
+      case "getDetailedStats":    result = getDetailedStats(body);    break;
       case "getEmailLog":         result = getEmailLog(body);         break;
       case "getPendingSMS":       result = getPendingSMS(body);       break;
       case "updateSMSStatus":     result = updateSMSStatus(body);     break;
@@ -1042,6 +1043,107 @@ function getStats(body) {
   });
 
   return { success: true, pending, approvedToday, rejectedToday, currentlyOut };
+}
+
+// ── 10.1 GET DETAILED STATS ─────────────────────────────────────────
+function getDetailedStats(body) {
+  const passSheet = getSheet("EXIT_PASSES");
+  const rows      = getAllRows(passSheet);
+  const userMap   = buildUserMap();
+  const now       = new Date();
+  
+  // Date filtering (default last 30 days)
+  const days     = parseInt(body.days) || 30;
+  const cutoff   = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const deptStats   = {};
+  const reasonStats = {};
+  const dailyTrends = {}; // YYYY-MM-DD -> count
+  const hourlyDist  = new Array(24).fill(0); // 0-23 hours
+  const userStats   = {}; // user_id -> { name, count, totalDurationMins }
+
+  let totalExits   = 0;
+  let totalDuration= 0;
+  let overdueCount = 0;
+  let completedExits = 0;
+
+  rows.forEach(r => {
+    const ap      = String(r[PASS_COLS.approval_status - 1] || "").trim().toUpperCase();
+    const mv      = String(r[PASS_COLS.movement_status - 1] || "").trim().toUpperCase();
+    const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
+    const exitT   = parseDate(r[PASS_COLS.exit_time - 1]);
+    const retT    = parseDate(r[PASS_COLS.return_time - 1]);
+    const exitTo  = parseDate(r[PASS_COLS.exit_to - 1]);
+    const uid     = normalizeUserId(r[PASS_COLS.user_id - 1]);
+    const user    = userMap[uid] || { name: uid, department: "Unknown" };
+    const dept    = user.department || "Unknown";
+    const reason  = r[PASS_COLS.reason - 1] || "Other";
+
+    if (!reqTime || reqTime < cutoff) return;
+
+    // Filter by department if requested
+    if (body.department && dept !== body.department) return;
+
+    totalExits++;
+
+    // Reason Distribution
+    reasonStats[reason] = (reasonStats[reason] || 0) + 1;
+
+    // Department Distribution
+    deptStats[dept] = (deptStats[dept] || 0) + 1;
+
+    // Daily Trends
+    const dateStr = reqTime.toISOString().split('T')[0];
+    dailyTrends[dateStr] = (dailyTrends[dateStr] || 0) + 1;
+
+    // Hourly Distribution (based on actual exit time or request time if not exited)
+    const activeTime = exitT || reqTime;
+    hourlyDist[activeTime.getHours()]++;
+
+    // User Insights
+    if (!userStats[uid]) {
+      userStats[uid] = { name: user.name, count: 0, duration: 0, dept: dept };
+    }
+    userStats[uid].count++;
+
+    // Duration & Completion
+    if (mv === "RETURNED" && exitT && retT) {
+      const dur = (retT - exitT) / (1000 * 60); // minutes
+      if (dur > 0) {
+        userStats[uid].duration += dur;
+        totalDuration += dur;
+        completedExits++;
+      }
+    }
+
+    // Overdue check
+    if (ap === "APPROVED" && mv === "EXITED" && exitTo && now > exitTo) {
+      overdueCount++;
+    }
+  });
+
+  // Top Frequent Exiters
+  const topUsers = Object.keys(userStats)
+    .map(uid => ({ uid, ...userStats[uid] }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  return {
+    success: true,
+    summary: {
+      totalExits,
+      overdueCount,
+      avgDuration: completedExits > 0 ? Math.round(totalDuration / completedExits) : 0,
+      periodDays: days
+    },
+    deptStats,
+    reasonStats,
+    dailyTrends,
+    hourlyDist,
+    topUsers
+  };
 }
 
 // ── EMAIL LOG ─────────────────────────────────────────────────────
