@@ -626,7 +626,7 @@ function createExitPass(body) {
       queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found with HR/Admin role AND a valid phone number.`);
     } else {
       const approveLink = `https://basilurservices.github.io/ExitPass/approve.html?id=${pass_id}`;
-      const smsMessage = `Exit Pass\nName: ${employeeName} (${user_id})\n${formatSmsTime(exit_from)}\nPass #${pass_id}.\n\n${approveLink}`;
+      const smsMessage = `Exit Pass\nName: ${employeeName} (${user_id})\nPass #${pass_id}.\n\n${approveLink}`;
       approverPhones.forEach(phone => queueSMS(phone, smsMessage));
     }
   } catch (smsErr) {
@@ -2151,7 +2151,7 @@ function remindApprover(body) {
         }
 
         if (approverPhones.length > 0) {
-          const smsMessage = `REMINDER: Exit Pass\nName: ${employeeName} (${ownerId})\n${formatSmsTime(passData.exit_from)}\nPass #${searchId}.`;
+          const smsMessage = `REMINDER: Exit Pass\nName: ${employeeName} (${ownerId})\nPass #${searchId}.`;
           approverPhones.forEach(phone => queueSMS(phone, smsMessage));
           return { success: true, message: "Reminders sent." };
         } else {

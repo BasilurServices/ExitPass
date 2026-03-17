@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="css/style.css?v=2.0">
     <style>
         .guard-layout {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
         }
 
@@ -61,11 +61,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
+            padding: 16px 20px;
             background: var(--bg-panel);
             border-radius: var(--radius);
-            border-left: 3px solid var(--border);
-            font-size: 13px;
+            border-left: 6px solid var(--border);
+            font-size: 16px;
             transition: background 0.2s, transform 0.1s;
             cursor: pointer;
             user-select: none;
@@ -119,25 +119,26 @@
 
         .log-entry__id {
             font-family: var(--font-mono);
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 0px;
-            font-size: 12px;
+            margin-bottom: 2px;
+            font-size: 16px;
             display: inline-block;
         }
 
         .log-entry__status-badge {
             display: inline-block;
-            margin-left: 8px;
-            font-size: 9px;
+            margin-left: 10px;
+            font-size: 11px;
+            padding: 2px 8px;
             vertical-align: middle;
         }
 
         .log-entry__name {
             color: var(--text-primary);
-            font-weight: 500;
-            margin-bottom: 0px;
-            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 18px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -145,7 +146,7 @@
 
         .log-entry__meta {
             color: var(--text-secondary);
-            font-size: 10px;
+            font-size: 13px;
         }
 
         .log-entry__action {
@@ -156,20 +157,20 @@
         /* Mobile Adjustments */
         @media (max-width: 600px) {
             .topbar {
-                height: 50px !important;
-                padding: 0 10px !important;
+                height: 60px !important;
+                padding: 0 12px !important;
             }
 
             .topbar__logo-text {
-                font-size: 0.8rem !important;
+                font-size: 0.9rem !important;
             }
 
             .topbar__logo-container {
-                height: 35px !important;
+                height: 40px !important;
             }
 
             .topbar__user {
-                padding: 2px 6px !important;
+                padding: 4px 8px !important;
             }
 
             .topbar__user #user-name {
@@ -177,28 +178,35 @@
             }
 
             .main {
-                padding: 8px 0 !important;
+                padding: 12px 0 !important;
             }
 
             .container {
-                padding: 0 8px !important;
+                padding: 0 6px !important;
             }
 
             .card {
-                padding: 10px !important;
+                padding: 8px !important;
+                border: none !important;
+                background: transparent !important;
+                box-shadow: none !important;
             }
 
             .log-entry {
-                padding: 6px 10px;
+                padding: 18px 16px;
+                border-left-width: 8px;
+                margin-bottom: 8px;
             }
 
             .log-entry__action .btn {
-                padding: 4px 8px;
-                font-size: 10px;
+                padding: 12px 16px;
+                font-size: 14px;
+                font-weight: 700;
             }
 
             .recent-log {
-                max-height: calc(100vh - 120px);
+                max-height: calc(100vh - 130px);
+                gap: 10px;
             }
         }
 
