@@ -633,7 +633,7 @@ function createExitPass(body) {
   }
 
     if (approverPhones.length === 0) {
-      queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found in 'USERS' sheet with both an HR/Admin role AND a valid phone number. Check columns.`);
+      queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found in user sheets with both an HR/Admin role AND a valid phone number. Check columns.`);
     } else {
       const approveLink = `https://basilurservices.github.io/ExitPass/approve.html?id=${pass_id}`;
       const smsMessage = `Exit Pass\nName: ${employeeName} (${user_id})\n${formatSmsTime(exit_from)}\nPass #${pass_id}.\n\n${approveLink}`;
@@ -1263,25 +1263,28 @@ function logEmailResult(passId, recipient, status, errorMsg) {
  */
 function sendExitPassNotification(pass) {
   const passSheet = getSheet("EXIT_PASSES");
-  const userSheet = getSheet("USERS");
-  const userRows  = getAllRows(userSheet);
 
   // ── Collect recipients ────────────────────────────────────────
   const recipients = [];
-  userRows.forEach(r => {
-    const role  = (r[USER_COLS.role  - 1] || "").toString().trim().toLowerCase();
-    const dept  = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
-    const email = (r[USER_COLS.email - 1] || "").toString().trim();
+  USER_SHEETS.forEach(sheetName => {
+    const sheet = getSheet(sheetName);
+    if (!sheet) return;
+    const userRows = getAllRows(sheet);
+    userRows.forEach(r => {
+      const role  = (r[USER_COLS.role  - 1] || "").toString().trim().toLowerCase();
+      const dept  = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
+      const email = (r[USER_COLS.email - 1] || "").toString().trim();
 
-    const isHrOrAdmin = 
-      role === "admin" || role === "approver" || role === "hr" || 
-      dept === "hr" || dept === "admin";
-      
-    if (isHrOrAdmin && email) {
-      if (!recipients.includes(email)) {
-        recipients.push(email);
+      const isHrOrAdmin = 
+        role === "admin" || role === "approver" || role === "hr" || 
+        dept === "hr" || dept === "admin";
+        
+      if (isHrOrAdmin && email) {
+        if (!recipients.includes(email)) {
+          recipients.push(email);
+        }
       }
-    }
+    });
   });
 
   if (recipients.length === 0) {
@@ -1548,7 +1551,7 @@ function autoExpirePasses() {
   let expired = 0;
   let overdue = 0;
   
-  const userMap = buildUserMap(getSheet("USERS"));
+  const userMap = buildUserMap();
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -1826,14 +1829,22 @@ function authorizeMailApp() {
       name: "Basilur Exit Pass System",
     });
     Logger.log("✅ authorizeMailApp: Authorization successful. Email sent to: " + me);
-    SpreadsheetApp.getUi().alert(
-      "✅ Authorization Successful!\n\n" +
-      "A test email was sent to: " + me + "\n\n" +
-      "Now redeploy your web app as a NEW VERSION to activate email notifications."
-    );
+    try {
+      SpreadsheetApp.getUi().alert(
+        "✅ Authorization Successful!\n\n" +
+        "A test email was sent to: " + me + "\n\n" +
+        "Now redeploy your web app as a NEW VERSION to activate email notifications."
+      );
+    } catch (uiErr) {
+      Logger.log("Notice: UI alert skipped (not in interactive context).");
+    }
   } catch (err) {
     Logger.log("❌ authorizeMailApp failed: " + err.message);
-    SpreadsheetApp.getUi().alert("❌ Failed: " + err.message);
+    try {
+      SpreadsheetApp.getUi().alert("❌ Failed: " + err.message);
+    } catch (uiErr) {
+       // Ignore UI failures
+    }
   }
 }
 
@@ -1917,7 +1928,7 @@ function setupDatabase() {
     ss.deleteSheet(defaultSheet);
   }
 
-  Logger.log("✅ Database setup complete! USERS, EXIT_PASSES, and EMAIL_LOG sheets are ready.");
+  Logger.log("✅ Database setup complete! User sheets, EXIT_PASSES, and EMAIL_LOG sheets are ready.");
 }
 
 // ── 12. USER PROFILE ─────────────────────────────────────────────

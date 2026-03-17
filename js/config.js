@@ -7,7 +7,7 @@
 
 const APP_CONFIG = {
   // Replace with your deployed Google Apps Script Web App URL
-  API_URL: "https://script.google.com/macros/s/AKfycbxcBj8VUeG2u5BM6-n3Rv63jjFPIPdaQl278i_1uNDkdN77lx7RWSezDKXU2CmqFSnb/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbzBiwG2w_KZBeUPmYtHiBF_Rlx9KoHn1gtBSNq3TVQnwqgGMFmE8N62--hgf_qK91Sf/exec",
 
   // Replace with your GitHub username
   GITHUB_USER: "basilurservices",
