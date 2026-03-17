@@ -807,8 +807,8 @@
         <td class="text-secondary">${UI.formatDateTime(p.request_time)}</td>
         <td>
           <div class="approve-actions-cell">
-            <button class="btn btn--success btn--sm" onclick="handleApprove('${p.pass_id}', 'APPROVED')">✓ Approve</button>
-            <button class="btn btn--danger btn--sm"  onclick="handleApprove('${p.pass_id}', 'REJECTED')">✕ Reject</button>
+            <button class="btn btn--success btn--sm" onclick="showApprovePopup('${p.pass_id}')">✓ Approve</button>
+            <button class="btn btn--danger btn--sm"  onclick="showApprovePopup('${p.pass_id}')">✕ Reject</button>
           </div>
         </td>
       </tr>
@@ -1251,10 +1251,10 @@
         <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Expected Return Time Frame</div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn btn--ghost btn--sm duration-btn" data-hours="1">1 Hour</button>
+            <button class="btn btn--ghost btn--sm duration-btn active" data-hours="1" style="background:var(--premium-blue); color:#fff;">1 Hour</button>
             <button class="btn btn--ghost btn--sm duration-btn" data-hours="2">2 Hours</button>
             <button class="btn btn--ghost btn--sm duration-btn" data-hours="3">3 Hours</button>
-            <button class="btn btn--ghost btn--sm duration-btn active" data-hours="NONE" style="background:var(--premium-blue); color:#fff;">No Limit</button>
+            <button class="btn btn--ghost btn--sm duration-btn" data-hours="NONE">No Limit</button>
           </div>
         </div>
       `;
