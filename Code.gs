@@ -520,7 +520,8 @@ function createExitPass(body) {
           const userMap = buildUserMap();
           const employee = userMap[userKey];
           if (employee && employee.phone) {
-             queueSMS(employee.phone, `Exit Pass REJECTED by system (Pass #${r[PASS_COLS.pass_id - 1]}). Please request a new one if needed.`);
+             const passId = r[PASS_COLS.pass_id - 1];
+             queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Please request again if needed.`);
           }
         } catch (smsErr) {
           Logger.log("Auto-reject SMS failed: " + smsErr.message);
@@ -594,7 +595,7 @@ function createExitPass(body) {
     const approverPhones = [];
     const userMap = buildUserMap(); // Updated helper
     const employeeData = userMap[normalizeUserId(user_id)] || {};
-    const employeeName = employeeData.name || user_id;
+    const employeeName = getShortName(employeeData.name || user_id);
 
     for (const sheetName of USER_SHEETS) {
       const userRows = getAllRows(getSheet(sheetName));
@@ -784,9 +785,9 @@ function approvePass(body) {
            const qrLink = `https://basilurservices.github.io/ExitPass/my_pass.html?id=${pass_id}`;
            let durationMsg = "";
            if (expected_duration && expected_duration !== "NONE") {
-             durationMsg = `\nExpected Return: Within ${expected_duration} hour(s)`;
+             durationMsg = `\nReturn: Within ${expected_duration} hr(s)`;
            }
-           const msg = `Exit Pass APPROVED\nPass #${pass_id}\nApprover: ${approver_name || 'System'}${durationMsg}\n\nLink: ${qrLink}`;
+           const msg = `Exit Pass APPROVED\nPass #${pass_id}${durationMsg}\n\n${qrLink}`;
            queueSMS(employee.phone, msg);
         }
       } catch (err) {
@@ -1578,7 +1579,8 @@ function autoExpirePasses() {
           const userKey = normalizeUserId(row[PASS_COLS.user_id - 1]);
           const employee = userMap[userKey];
           if (employee && employee.phone) {
-             queueSMS(employee.phone, `Exit Pass REJECTED by system (Pass #${row[PASS_COLS.pass_id - 1]}). Please request a new one if needed.`);
+             const passId = row[PASS_COLS.pass_id - 1];
+             queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Please request again if needed.`);
           }
         } catch(e) {
           Logger.log("Auto-reject trigger SMS failed: " + e.message);
@@ -1689,12 +1691,53 @@ function formatPassRow(row, userMap) {
   };
 }
 
+/**
+ * Truncates a full name to only the first two parts.
+ */
+function getShortName(fullName) {
+  if (!fullName) return "";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 2) return fullName;
+  return parts.slice(0, 2).join(" ");
+}
+
 // ── SMS NOTIFICATION SYSTEM ───────────────────────────────────────
 /**
  * Inserts a new SMS into the SMS_QUEUE sheet.
  */
 function queueSMS(phoneNumber, message) {
-  if (!phoneNumber) return;
+  if (!phoneNumber || !message) return;
+  
+  let finalMessage = message;
+  
+  // ── SMS Length Limit (160 characters) ─────────────────────
+  if (finalMessage.length > 160) {
+    // Try to preserve URL if present
+    const urlMatch = finalMessage.match(/https?:\/\/[^\s]+/);
+    if (urlMatch) {
+      const url = urlMatch[0];
+      const urlIndex = finalMessage.indexOf(url);
+      
+      // Calculate how much space we have for the text before the URL
+      // Total 160 - URL length - 5 (for "..." and "\n\n")
+      const maxTextLen = 160 - url.length - 5; 
+      if (maxTextLen > 0) {
+        let textBefore = finalMessage.substring(0, urlIndex).trim();
+        if (textBefore.length > maxTextLen) {
+          textBefore = textBefore.substring(0, maxTextLen) + "...";
+        }
+        finalMessage = textBefore + "\n\n" + url;
+      } else {
+        // URL itself is too long or nearly 160, just truncate the whole thing
+        finalMessage = finalMessage.substring(0, 157) + "...";
+      }
+    } else {
+      // No URL, simple truncation
+      finalMessage = finalMessage.substring(0, 157) + "...";
+    }
+    Logger.log(`⚠️ SMS Truncated (Original length: ${message.length}): ${finalMessage}`);
+  }
+
   try {
     let sheet = getSheet("SMS_QUEUE");
     if (!sheet) {
@@ -1719,7 +1762,7 @@ function queueSMS(phoneNumber, message) {
     const createdAt = now();
     
     // id, phone_number, message, status, created_at, sent_at
-    sheet.appendRow([id, phoneNumber, message, "PENDING", createdAt, ""]);
+    sheet.appendRow([id, phoneNumber, finalMessage, "PENDING", createdAt, ""]);
   } catch(e) {
     Logger.log("queueSMS failed: " + e.message);
   }
@@ -1845,6 +1888,31 @@ function authorizeMailApp() {
     } catch (uiErr) {
        // Ignore UI failures
     }
+  }
+}
+
+/**
+ * Sends a test email to systems7.basilurtea@gmail.com
+ * to verify connectivity and delivery.
+ */
+function testEmailToSystems7() {
+  const email = "systems7.basilurtea@gmail.com";
+  try {
+    MailApp.sendEmail({
+      to:      email,
+      subject: "[Basilur Exit Pass] 🧪 Test Email Notification",
+      body:    "This is a manual test email from the Exit Pass Management System to verify connectivity and delivery to this address.",
+      name:     "Basilur Exit Pass System",
+    });
+    Logger.log("✅ Test email sent to: " + email);
+    try {
+      SpreadsheetApp.getUi().alert("✅ Test email sent successfully to: " + email);
+    } catch (e) {}
+  } catch (err) {
+    Logger.log("❌ Test email failed: " + err.message);
+    try {
+      SpreadsheetApp.getUi().alert("❌ Test email failed: " + err.message);
+    } catch (e) {}
   }
 }
 
@@ -2068,7 +2136,7 @@ function remindApprover(body) {
         
         const approverPhones = [];
         const userMap = buildUserMap();
-        const employeeName = (userMap[ownerId] || {}).name || ownerId;
+        const employeeName = getShortName((userMap[ownerId] || {}).name || ownerId);
 
         for (const sheetName of USER_SHEETS) {
           const uSheet = getSheet(sheetName);
@@ -2124,4 +2192,28 @@ function setupTriggers() {
     .create();
     
   Logger.log("Triggers setup successfully! System will now auto-reject/expire every 10 minutes.");
+}
+
+// ── VERIFICATION: TEST SMS TRUNCATION ────────────────────────────
+function verifySmsChanges() {
+  Logger.log("--- Testing getShortName ---");
+  Logger.log("John Doe Smith -> " + getShortName("John Doe Smith"));
+  Logger.log("John Doe       -> " + getShortName("John Doe"));
+  Logger.log("John           -> " + getShortName("John"));
+
+  Logger.log("\n--- Testing queueSMS Truncation ---");
+  
+  // 1. Long message without link (expect truncation at 160)
+  const longMsgNoUrl = "This is a very long message that is definitely going to exceed the 160 character limit that we have just implemented in our system to ensure that all SMS messages are delivered correctly to the users without being cut off by the gateway.";
+  queueSMS("TEST_1", longMsgNoUrl);
+  
+  // 2. Long message with link at the end (expect text truncation but URL preserved)
+  const longMsgWithUrl = "Attention! Your exit pass has been processed and and and and and and and and and and and and and and and and and and and and and and and and and if you want to see the details please visit our portal. " + 
+                         "https://basilurservices.github.io/ExitPass/my_pass.html?id=PASS1234567890";
+  queueSMS("TEST_2", longMsgWithUrl);
+  
+  // 3. Normal message (expect no change)
+  queueSMS("TEST_3", "Short message.");
+  
+  Logger.log("Sent 3 test messages to SMS_QUEUE. Please check the sheet manually or via tool.");
 }
