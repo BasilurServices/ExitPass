@@ -223,6 +223,18 @@ function normalizeUserId(uid) {
   return s.toUpperCase();
 }
 
+/**
+ * Flexible check for HR, Admin, or Approver roles/departments.
+ * Matches keywords within strings to allow for "HR Manager", "System Admin", etc.
+ */
+function isPrivilegedUser(role, dept) {
+  const r = String(role || "").toLowerCase();
+  const d = String(dept || "").toLowerCase();
+  const keywords = ["hr", "admin", "approver", "human resources", "administrator"];
+  
+  return keywords.some(k => r.includes(k) || d.includes(k));
+}
+
 // ── 1. LOGIN USER ─────────────────────────────────────────────────
 function loginUser(body) {
   const userId = normalizeUserId(body.user_id);
@@ -248,9 +260,7 @@ function loginUser(body) {
   const role = (row[USER_COLS.role - 1] || "employee").toString().trim().toLowerCase();
   const department = (row[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
 
-  const isHrOrAdmin = 
-    role === "admin" || role === "approver" || role === "hr" || 
-    department === "hr" || department === "admin";
+  const isHrOrAdmin = isPrivilegedUser(role, department);
 
   if (isHrOrAdmin) {
     const storedPassword = (row[USER_COLS.password - 1] || "").toString().trim();
@@ -600,41 +610,20 @@ function createExitPass(body) {
     for (const sheetName of USER_SHEETS) {
       const userRows = getAllRows(getSheet(sheetName));
       userRows.forEach(r => {
-        let isHrOrAdmin = false;
-        let rPhone = "";
+        const role = (r[USER_COLS.role - 1] || "").toString().trim();
+        const dept = (r[USER_COLS.department - 1] || "").toString().trim();
+        const phone = r[USER_COLS.phone - 1] ? r[USER_COLS.phone - 1].toString().trim() : "";
 
-      for (let i = 0; i < r.length; i++) {
-        const val = (r[i] || "").toString().trim().toLowerCase();
-        if (["hr", "admin", "approver", "hr manager", "human resources", "administrator", "system admin"].includes(val)) {
-           isHrOrAdmin = true;
+        if (isPrivilegedUser(role, dept) && phone) {
+          if (!approverPhones.includes(phone)) {
+            approverPhones.push(phone);
+          }
         }
-        if (/^\+?\d{9,15}$/.test(val)) {
-           rPhone = val;
-        }
-      }
-
-      if (!isHrOrAdmin) {
-        const fallbackRole = (r[USER_COLS.role - 1] || "").toString().trim().toLowerCase();
-        const fallbackDept = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
-        if (fallbackRole.includes("admin") || fallbackRole.includes("hr") || fallbackRole.includes("approver") ||
-            fallbackDept.includes("admin") || fallbackDept.includes("hr")) {
-            isHrOrAdmin = true;
-        }
-      }
-      if (!rPhone) {
-        rPhone = r[USER_COLS.phone - 1] ? r[USER_COLS.phone - 1].toString().trim() : "";
-      }
-
-      if (isHrOrAdmin && rPhone) {
-        if (!approverPhones.includes(rPhone)) {
-          approverPhones.push(rPhone);
-        }
-      }
-    });
-  }
+      });
+    }
 
     if (approverPhones.length === 0) {
-      queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found in user sheets with both an HR/Admin role AND a valid phone number. Check columns.`);
+      queueSMS("SYSTEM_LOG", `Failed to notify HR for Pass #${pass_id}: No users found with HR/Admin role AND a valid phone number.`);
     } else {
       const approveLink = `https://basilurservices.github.io/ExitPass/approve.html?id=${pass_id}`;
       const smsMessage = `Exit Pass\nName: ${employeeName} (${user_id})\n${formatSmsTime(exit_from)}\nPass #${pass_id}.\n\n${approveLink}`;
@@ -655,7 +644,7 @@ function createExitPass(body) {
       department:      employeeData.department || "—",
       reason,
       exit_from,
-      exit_to:         exit_to || "",
+      exit_to:         finalExitTo || "",
       return_required: return_required || "Yes",
       request_time:    requestTime,
     });
@@ -1271,27 +1260,35 @@ function sendExitPassNotification(pass) {
     const sheet = getSheet(sheetName);
     if (!sheet) return;
     const userRows = getAllRows(sheet);
+    
+    Logger.log(`Checking ${sheetName} for email recipients...`);
+    
     userRows.forEach(r => {
-      const role  = (r[USER_COLS.role  - 1] || "").toString().trim().toLowerCase();
-      const dept  = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
+      const name  = (r[USER_COLS.name  - 1] || "").toString().trim();
+      const role  = (r[USER_COLS.role  - 1] || "").toString().trim();
+      const dept  = (r[USER_COLS.department - 1] || "").toString().trim();
       const email = (r[USER_COLS.email - 1] || "").toString().trim();
 
-      const isHrOrAdmin = 
-        role === "admin" || role === "approver" || role === "hr" || 
-        dept === "hr" || dept === "admin";
-        
-      if (isHrOrAdmin && email) {
-        if (!recipients.includes(email)) {
-          recipients.push(email);
+      if (isPrivilegedUser(role, dept)) {
+        if (email) {
+          if (!recipients.includes(email)) {
+            recipients.push(email);
+            Logger.log(`✅ Recipient added: ${name} (${email}) | Role: ${role} | Dept: ${dept}`);
+          }
+        } else {
+          Logger.log(`⚠️ User ${name} has privileged role [${role}] but NO email address.`);
         }
       }
     });
   });
 
   if (recipients.length === 0) {
-    Logger.log("No approver/HR emails found. Skipping notification.");
+    const errorMsg = "No approver/HR emails found. Check USER sheets for valid roles and email addresses.";
+    Logger.log("❌ " + errorMsg);
     // Mark the pass column as NONE
     updatePassEmailStatus(passSheet, pass.pass_id, "NONE");
+    // Explicitly log the failure for user visibility
+    logEmailResult(pass.pass_id, "N/A", "FAILED", errorMsg);
     return;
   }
 
@@ -2143,15 +2140,11 @@ function remindApprover(body) {
           if (!uSheet) continue;
           const uRows = getAllRows(uSheet);
           uRows.forEach(r => {
-            const role = (r[USER_COLS.role - 1] || "").toString().trim().toLowerCase();
-            const dept = (r[USER_COLS.department - 1] || "").toString().trim().toLowerCase();
+            const role = (r[USER_COLS.role - 1] || "").toString().trim();
+            const dept = (r[USER_COLS.department - 1] || "").toString().trim();
             const phone = r[USER_COLS.phone - 1] ? r[USER_COLS.phone - 1].toString().trim() : "";
             
-            const isHrOrAdmin = 
-              role === "admin" || role === "approver" || role === "hr" || 
-              dept === "hr" || dept === "admin";
-              
-            if (isHrOrAdmin && phone && !approverPhones.includes(phone)) {
+            if (isPrivilegedUser(role, dept) && phone && !approverPhones.includes(phone)) {
               approverPhones.push(phone);
             }
           });
