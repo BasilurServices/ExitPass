@@ -477,10 +477,30 @@ function createExitPass(body) {
       movement === "RETURNED" || 
       movement === "EXPIRED" || 
       movement === "CANCELLED" || 
+      movement === "NOT_UPDATED" || 
       approval === "REJECTED" || 
       approval === "CANCELLED";
 
     if (isCompleted) continue;
+
+    // ── Handle Previous Day's Overdue Passes ───────────────────
+    const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
+    if (reqTime && !isToday(reqTime)) {
+      const rowIndex = i + 2; // +1 for 0-index, +1 for header
+      let newStatus = "EXPIRED";
+      
+      if (movement === "EXITED") {
+        const retReq = r[PASS_COLS.return_required - 1];
+        if (retReq === "No") {
+          newStatus = "EXPIRED";
+        } else {
+          newStatus = "NOT_UPDATED";
+        }
+      }
+      
+      sheet.getRange(rowIndex, PASS_COLS.movement_status).setValue(newStatus);
+      continue; // This pass is now marked as terminal, unblocking the user
+    }
 
     if (approval === "PENDING") {
       const reqTime = parseDate(r[PASS_COLS.request_time - 1]);
@@ -871,10 +891,10 @@ function updateMovementStatus(body) {
       const returnRequired = row[PASS_COLS.return_required - 1];
       let finalMovement = movement;
       
-      // If movement is EXITED and no return is required, mark as RETURNED (Completed)
+      // If movement is EXITED and no return is required, mark as EXPIRED
       // to prevent reuse and simplify logic.
       if (movement === "EXITED" && returnRequired === "No") {
-        finalMovement = "RETURNED";
+        finalMovement = "EXPIRED";
       }
 
       const rowValues = [...rows[i]];
