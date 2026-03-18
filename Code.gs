@@ -530,8 +530,8 @@ function createExitPass(body) {
           const userMap = buildUserMap();
           const employee = userMap[userKey];
           if (employee && employee.phone) {
-             const passId = r[PASS_COLS.pass_id - 1];
-             queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Please request again if needed.`);
+              const passId = r[PASS_COLS.pass_id - 1];
+              queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Request timed out. Please contact HR or request again.`);
           }
         } catch (smsErr) {
           Logger.log("Auto-reject SMS failed: " + smsErr.message);
@@ -770,14 +770,19 @@ function approvePass(body) {
         const userKey = normalizeUserId(rows[i][PASS_COLS.user_id - 1]);
         const userMap = buildUserMap();
         const employee = userMap[userKey];
-        if (employee && employee.phone && status === "APPROVED") {
-           const qrLink = `https://basilurservices.github.io/ExitPass/my_pass.html?id=${pass_id}`;
-           let durationMsg = "";
-           if (expected_duration && expected_duration !== "NONE") {
-             durationMsg = `\nReturn: Within ${expected_duration} hr(s)`;
+        if (employee && employee.phone) {
+           if (status === "APPROVED") {
+             const qrLink = `https://basilurservices.github.io/ExitPass/my_pass.html?id=${pass_id}`;
+             let durationMsg = "";
+             if (expected_duration && expected_duration !== "NONE") {
+               durationMsg = `\nReturn: Within ${expected_duration} hr(s)`;
+             }
+             const msg = `Exit Pass APPROVED\nPass #${pass_id}${durationMsg}\n\n${qrLink}`;
+             queueSMS(employee.phone, msg);
+           } else if (status === "REJECTED") {
+             const msg = `Exit Pass REJECTED (Pass #${pass_id}). Please contact HR for more information.`;
+             queueSMS(employee.phone, msg);
            }
-           const msg = `Exit Pass APPROVED\nPass #${pass_id}${durationMsg}\n\n${qrLink}`;
-           queueSMS(employee.phone, msg);
         }
       } catch (err) {
         Logger.log("SMS for approval failed: " + err.message);
@@ -1561,6 +1566,18 @@ function autoExpirePasses() {
     // 1. Auto-expire unused APPROVED passes
     if (approval === "APPROVED" && movement === "NOT_EXITED" && exitTo && nowTime > exitTo) {
       sheet.getRange(i + 1, PASS_COLS.movement_status).setValue("EXPIRED");
+      
+      // Notify employee of expiry
+      try {
+        const userKey = normalizeUserId(row[PASS_COLS.user_id - 1]);
+        const employee = userMap[userKey];
+        if (employee && employee.phone) {
+          const passId = row[PASS_COLS.pass_id - 1];
+          queueSMS(employee.phone, `Exit Pass EXPIRED (Pass #${passId}). Your approved pass was not used within the time frame.`);
+        }
+      } catch (e) {
+        Logger.log("Auto-expire notification failed: " + e.message);
+      }
       expired++;
     }
 
@@ -1577,7 +1594,7 @@ function autoExpirePasses() {
           const employee = userMap[userKey];
           if (employee && employee.phone) {
              const passId = row[PASS_COLS.pass_id - 1];
-             queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Please request again if needed.`);
+             queueSMS(employee.phone, `Exit Pass REJECTED (Pass #${passId}). Request timed out. Please contact HR or request again.`);
           }
         } catch(e) {
           Logger.log("Auto-reject trigger SMS failed: " + e.message);
