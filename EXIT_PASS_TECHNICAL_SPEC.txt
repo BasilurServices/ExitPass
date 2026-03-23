@@ -1,0 +1,79 @@
+================================================================================
+🚀 PROJECT TECHNICAL SPECIFICATION & DESCRIPTION: BASILUR EXIT PASS SYSTEM
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+The Basilur Exit Pass Management System is a comprehensive digital solution 
+designed to replace manual, paper-based exit logs with a streamlined, ultra-secure 
+QR-based workflow. It provides real-time tracking, automated notifications, 
+and advanced behavioral analytics for employee movements within the organization.
+
+2. CORE TECHNICAL STACK
+--------------------------------------------------------------------------------
+• Frontend: 
+  - Technologies: HTML5, Vanilla CSS3, Vanilla JavaScript (ES6+).
+  - Hosting: GitHub Pages (SSL secured).
+  - Design: Mobile-first, responsive UI optimized for rugged gate-side tablets.
+
+• Backend & API Layer:
+  - Platform: Google Apps Script (GAS).
+  - Deployment: RESTful Web App API.
+  - Role: Handles complex business logic, authentication, and database orchestration.
+
+• Database Layer:
+  - Engine: Google Sheets (Cloud-based persistence).
+  - Data Structure: Multi-sheet architecture (USERS, EXIT_PASSES, EMAIL_LOGS).
+  - Capacity: Scalable to thousands of records with optimized range-based queries.
+
+• Integration & Hardware:
+  - QR Generation: Client-side generation using qrcode.js.
+  - QR Scanning: High-performance browser-based scanning using jsQR.
+  - SMS Gateway: Python-based local service polling the backend API, 
+    communicating via Gammu with a physical GSM Modem (Huawei E3372).
+
+3. KEY FUNCTIONAL MODULES
+--------------------------------------------------------------------------------
+• ROLE-BASED ACCESS CONTROL (RBAC)
+  - Employee: Submits requests, monitors status, accesses personal QR pass history.
+  - Approver: Department heads review and approve passes with expected return windows.
+  - Security Guard: Dedicated interface for gate-side scanning and manual ID entry.
+  - HR/Admin: Advanced dashboard for system-wide oversight and user management.
+
+• MULTI-CHANNEL NOTIFICATION ENGINE
+  - Real-time SMS: Alerts to Employees (approval/rejection) and Approvers (new requests).
+  - Automated Overdue Alerts: System-triggered SMS for employees exceeding return buffers.
+  - HTML Email: Detailed audit trail for every status change, delivered via Google MailApp.
+
+• HR ANALYTICS DASHBOARD
+  - Live Stats: Real-time headcounts (Pending, Currently Out, Approved).
+  - Trend Analysis: 7/30/90-day growth/decline charts and peak hourly analysis.
+  - Behavioral Tracking: Reason distribution (Doughnut charts) and Departmental comparisons.
+  - Data Portability: Single-click CSV export of the entire movement history for auditing.
+
+4. CORE LOGIC & BUSINESS RULES
+--------------------------------------------------------------------------------
+• Movement Hierarchy:
+  - Strict logical progression: NOT_EXITED → EXITED → RETURNED/EXPIRED.
+  - Precision timestamps captured at the exact moment of physical gate scan.
+
+• System Integrity Rules:
+  - Anti-Duplication: Prevents users from having multiple concurrent active passes.
+  - Auto-Maintenance: Mark stale requests (>2hr old or previous day) as REJECTED/EXPIRED.
+  - User Normalization: Intelligent ID formatting (e.g., "002" -> "2") to ensure data consistency.
+
+• Security Guard Controls:
+  - Live Monitoring: The Guard List auto-refreshes every 5 minutes.
+  - Visual Indicators: Pulse-red alerts for overdue employees.
+  - Force-Override: Long-press functionality (800ms) to manually correct human errors.
+
+5. INFRASTRUCTURE & SCALABILITY
+--------------------------------------------------------------------------------
+• Connectivity: Operates over standard HTTPS; requires minimal bandwidth.
+• Deployment: Serverless backend (GAS) ensures zero server maintenance costs.
+• SMS Gateway: Decoupled local Python service ensures high reliability even 
+  during internet fluctuations (via GSM modem).
+
+================================================================================
+BASILUR SERVICES - SECURING ORGANIZATIONAL MOVEMENTS
+================================================================================
