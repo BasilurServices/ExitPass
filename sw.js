@@ -1,4 +1,4 @@
-const CACHE_NAME = 'exitpass-v1';
+const CACHE_NAME = 'exitpass-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -14,7 +14,9 @@ const ASSETS_TO_CACHE = [
   './js/config.js',
   './js/ui.js',
   './logo.png',
-  './manifest.json'
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 // Install Event
