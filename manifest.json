@@ -1,0 +1,17 @@
+{
+  "name": "Basilur Exit Pass System",
+  "short_name": "ExitPass",
+  "description": "Digital exit pass management system for Basilur employees.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#002c5c",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ],
+  "orientation": "portrait"
+}

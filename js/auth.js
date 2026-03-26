@@ -41,6 +41,9 @@ const Auth = (() => {
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 
+    // Save session to cookies for persistent "Remember Me" behavior (30 days)
+    setCookie(SESSION_KEY, btoa(JSON.stringify(session)), 30);
+    
     // Save user_id to cookies to prepopulate login later
     setCookie("ep_previous_login", data.user_id, 30);
 
@@ -50,7 +53,18 @@ const Auth = (() => {
   /** Get current session or null */
   function getSession() {
     try {
-      const raw = localStorage.getItem(SESSION_KEY);
+      let raw = localStorage.getItem(SESSION_KEY);
+      
+      // Fallback to cookie if localStorage is empty
+      if (!raw) {
+        const cookieData = getCookie(SESSION_KEY);
+        if (cookieData) {
+          raw = atob(cookieData);
+          // Restore to localStorage
+          localStorage.setItem(SESSION_KEY, raw);
+        }
+      }
+
       if (!raw) return null;
       const session = JSON.parse(raw);
 
@@ -72,6 +86,7 @@ const Auth = (() => {
   /** Clear session (logout) */
   function clearSession() {
     localStorage.removeItem(SESSION_KEY);
+    setCookie(SESSION_KEY, "", -1); // Clear cookie
   }
 
   /** Require auth. If not authed, redirect to login. Returns session or redirects. */
